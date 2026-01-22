@@ -23,7 +23,7 @@ def unsupervised_predict(config, data_loader, method_name):
     SNR_all = []
     MACC_all = []
     sbar = tqdm(data_loader["unsupervised"], ncols=80)
-    for _, test_batch in enumerate(sbar):
+    for it, test_batch in enumerate(sbar):
         batch_size = test_batch[0].shape[0]
         for idx in range(batch_size):
             data_input, labels_input = test_batch[0][idx].cpu().numpy(), test_batch[1][idx].cpu().numpy()
@@ -45,6 +45,7 @@ def unsupervised_predict(config, data_loader, method_name):
             else:
                 raise ValueError("unsupervised method name wrong!")
 
+            # np.savetxt(f"BVP_{method_name}_{it}.txt", BVP, fmt='%.7e')
             video_frame_size = test_batch[0].shape[1]
             if config.INFERENCE.EVALUATION_WINDOW.USE_SMALLER_WINDOW:
                 window_frame_size = config.INFERENCE.EVALUATION_WINDOW.WINDOW_SIZE * config.UNSUPERVISED.DATA.FS
@@ -54,6 +55,7 @@ def unsupervised_predict(config, data_loader, method_name):
                 window_frame_size = video_frame_size
 
             for i in range(0, len(BVP), window_frame_size):
+                # print('\nwindow')
                 BVP_window = BVP[i:i+window_frame_size]
                 label_window = labels_input[i:i+window_frame_size]
 
@@ -139,6 +141,7 @@ def unsupervised_predict(config, data_loader, method_name):
                 raise ValueError("Wrong Test Metric Type")
     elif config.INFERENCE.EVALUATION_METHOD == "FFT":
         predict_hr_fft_all = np.array(predict_hr_fft_all)
+        np.savetxt(f"HR_{method_name}.txt", predict_hr_fft_all, fmt='%.7e')
         gt_hr_fft_all = np.array(gt_hr_fft_all)
         SNR_all = np.array(SNR_all)
         MACC_all = np.array(MACC_all)
