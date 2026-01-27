@@ -4,9 +4,11 @@ UNSUPERVISED:
   METHOD: ["ICA", "POS", "CHROM", "GREEN", "LGI", "PBV", "OMIT"]
   METRICS: ['MAE', 'RMSE', 'MAPE', 'Pearson', 'SNR', 'BA']
   DATA:
-    FS: 30
+    INFO:
+      SKIN_COLOR: [1, 2, 3, 4] 
+    FS: 25
     DATASET: ICU
-    DO_PREPROCESS: False               # if first time, should be true
+    DO_PREPROCESS: True               # if first time, should be true
     DATA_FORMAT: NDHWC
     DATA_PATH: "/home/sophia/rPPG-Toolbox/data/ICU/RawData"                     # Raw dataset path
     CACHED_PATH: "/home/sophia/rPPG-Toolbox/data/ICU/preprocessed"    # Processed dataset save path
@@ -22,11 +24,11 @@ UNSUPERVISED:
       CROP_FACE:
         DO_CROP_FACE: True
         BACKEND: 'HC'    # HC for Haar Cascade, Y5F for YOLO5Face
-        USE_LARGE_FACE_BOX: True
+        USE_LARGE_FACE_BOX: False
         LARGE_BOX_COEF: 1.5
         DETECTION:
-          DO_DYNAMIC_DETECTION: False
-          DYNAMIC_DETECTION_FREQUENCY : 30
+          DO_DYNAMIC_DETECTION: True
+          DYNAMIC_DETECTION_FREQUENCY : 25
           USE_MEDIAN_FACE_BOX: False    # This should be used ONLY if dynamic detection is used
       RESIZE:
         H: 72

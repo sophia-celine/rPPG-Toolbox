@@ -10,6 +10,7 @@ from unsupervised_methods.methods.POS_WANG import *
 from unsupervised_methods.methods.OMIT import *
 from tqdm import tqdm
 from evaluation.BlandAltmanPy import BlandAltman
+import matplotlib.pyplot as plt
 
 def unsupervised_predict(config, data_loader, method_name):
     """ Model evaluation on the testing dataset."""
@@ -44,6 +45,14 @@ def unsupervised_predict(config, data_loader, method_name):
                 BVP = OMIT(data_input)
             else:
                 raise ValueError("unsupervised method name wrong!")
+
+            plt.figure()
+            plt.specgram(BVP, Fs=config.UNSUPERVISED.DATA.FS)
+            plt.title(f'{method_name} Spectrogram')
+            plt.xlabel('Time (s)')
+            plt.ylabel('Frequency (Hz)')
+            plt.savefig(f'spectrogram_{method_name}_{it}_{idx}.png')
+            plt.close()
 
             # np.savetxt(f"BVP_{method_name}_{it}.txt", BVP, fmt='%.7e')
             video_frame_size = test_batch[0].shape[1]
@@ -143,6 +152,7 @@ def unsupervised_predict(config, data_loader, method_name):
         predict_hr_fft_all = np.array(predict_hr_fft_all)
         np.savetxt(f"HR_{method_name}.txt", predict_hr_fft_all, fmt='%.7e')
         gt_hr_fft_all = np.array(gt_hr_fft_all)
+        np.savetxt(f"GT_HR_{method_name}.txt", gt_hr_fft_all, fmt='%.7e')
         SNR_all = np.array(SNR_all)
         MACC_all = np.array(MACC_all)
         num_test_samples = len(predict_hr_fft_all)
