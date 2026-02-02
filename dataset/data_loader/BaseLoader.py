@@ -332,6 +332,10 @@ class BaseLoader(Dataset):
                 new_x = center_x - (square_size // 2)
                 new_y = center_y - (square_size // 2)
                 face_box_coor = [new_x, new_y, square_size, square_size]
+                # face_crop = frame[y_min:y_max, x_min:x_max]
+                # cv2.imshow("Face", face_crop)
+                # cv2.waitKey(0)
+                # cv2.destroyAllWindows()
 
             else:
                 print("ERROR: No Face Detected")

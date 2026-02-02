@@ -51,7 +51,7 @@ def unsupervised_predict(config, data_loader, method_name):
             plt.title(f'{method_name} Spectrogram')
             plt.xlabel('Time (s)')
             plt.ylabel('Frequency (Hz)')
-            plt.savefig(f'spectrogram_{method_name}_{it}_{idx}.png')
+            plt.savefig(f'hr_results/spectrogram_{method_name}_{it}_{idx}.png')
             plt.close()
 
             # np.savetxt(f"BVP_{method_name}_{it}.txt", BVP, fmt='%.7e')
@@ -150,9 +150,9 @@ def unsupervised_predict(config, data_loader, method_name):
                 raise ValueError("Wrong Test Metric Type")
     elif config.INFERENCE.EVALUATION_METHOD == "FFT":
         predict_hr_fft_all = np.array(predict_hr_fft_all)
-        np.savetxt(f"HR_{method_name}.txt", predict_hr_fft_all, fmt='%.7e')
+        np.savetxt(f"hr_results/HR_{method_name}.txt", predict_hr_fft_all, fmt='%.7e')
         gt_hr_fft_all = np.array(gt_hr_fft_all)
-        np.savetxt(f"GT_HR_{method_name}.txt", gt_hr_fft_all, fmt='%.7e')
+        np.savetxt(f"hr_results/GT_HR_{method_name}.txt", gt_hr_fft_all, fmt='%.7e')
         SNR_all = np.array(SNR_all)
         MACC_all = np.array(MACC_all)
         num_test_samples = len(predict_hr_fft_all)
