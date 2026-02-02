@@ -17,13 +17,6 @@ from unsupervised_methods import utils
 import math
 import multiprocessing as mp
 
-# To be used only for preparing data - for detecting face with YOLO5Face
-try:
-    mp.set_start_method('spawn', force=True)
-    # print("spawned")
-except RuntimeError:
-    pass
-
 import cv2
 import numpy as np
 import pandas as pd
@@ -65,11 +58,11 @@ class BaseLoader(Dataset):
         self.data_format = config_data.DATA_FORMAT
         self.do_preprocess = config_data.DO_PREPROCESS
         self.config_data = config_data
+        self.device = device
 
         if self.do_preprocess:
-            from dataset.data_loader.face_detector.YOLO5Face import YOLO5Face
             if 'Y5F' in self.config_data.PREPROCESS.CROP_FACE.BACKEND:
-                self.Y5FObj = YOLO5Face(self.config_data.PREPROCESS.CROP_FACE.BACKEND, device)
+                self.Y5FObj = None
 
         assert (config_data.BEGIN < config_data.END)
         assert (config_data.BEGIN > 0 or config_data.BEGIN == 0)
@@ -311,6 +304,10 @@ class BaseLoader(Dataset):
         elif "Y5F" in backend:
             # Use a YOLO5Face trained on WiderFace dataset
             # This utilizes both the CPU and GPU
+            if not hasattr(self, 'Y5FObj') or self.Y5FObj is None:
+                from dataset.data_loader.face_detector.YOLO5Face import YOLO5Face
+                # lazy-load the model in the subprocess
+                self.Y5FObj = YOLO5Face(self.config_data.PREPROCESS.CROP_FACE.BACKEND, self.device)
 
             res = self.Y5FObj.detect_face(frame[:, :, :3].astype(np.uint8))
 
@@ -473,7 +470,7 @@ class BaseLoader(Dataset):
             count += 1
         return input_path_name_list, label_path_name_list
 
-    def multi_process_manager(self, data_dirs, config_preprocess, multi_process_quota=8):
+    def multi_process_manager(self, data_dirs, config_preprocess, multi_process_quota=1):
         """Allocate dataset preprocessing across multiple processes.
 
         Args:

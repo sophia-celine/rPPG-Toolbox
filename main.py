@@ -3,7 +3,7 @@
 import argparse
 import random
 import time
-
+import torch.multiprocessing as mp
 import numpy as np
 import torch
 from config import get_config
@@ -139,6 +139,11 @@ def unsupervised_method_inference(config, data_loader):
 
 
 if __name__ == "__main__":
+    try:
+        mp.set_start_method('spawn', force=True)
+        print("multiprocessing start method set to 'spawn'")
+    except RuntimeError:
+        pass
     # parse arguments.
     parser = argparse.ArgumentParser()
     parser = add_args(parser)
@@ -327,7 +332,7 @@ if __name__ == "__main__":
             device=config.DEVICE)
         data_loader_dict["unsupervised"] = DataLoader(
             dataset=unsupervised_data,
-            num_workers=16,
+            num_workers=0,
             batch_size=1,
             shuffle=False,
             worker_init_fn=seed_worker,
