@@ -38,6 +38,7 @@ class testLoader(BaseLoader):
 
     def get_raw_data(self, data_path):
         """Returns data directories under the path(For test dataset)."""
+        print('getting raw data')
         data_dirs = glob.glob(data_path + os.sep + "subject*")
         if not data_dirs:
             raise ValueError(self.dataset_name + " data paths empty!")
@@ -63,12 +64,14 @@ class testLoader(BaseLoader):
         """ invoked by preprocess_dataset for multi_process."""
         filename = os.path.split(data_dirs[i]['path'])[-1]
         saved_filename = data_dirs[i]['index']
+        print('test loader', saved_filename)
 
         # Read Frames
         if 'None' in config_preprocess.DATA_AUG:
             # Utilize dataset-specific function to read video
             frames = self.read_video(
                 os.path.join(data_dirs[i]['path'],"vid.avi"))
+            print('frames', frames.shape)
         elif 'Motion' in config_preprocess.DATA_AUG:
             # Utilize general function to read video in .npy format
             frames = self.read_npy_video(
@@ -90,15 +93,22 @@ class testLoader(BaseLoader):
     @staticmethod
     def read_video(video_file):
         """Reads a video file, returns frames(T, H, W, 3) """
+        print('video file', video_file)
         VidObj = cv2.VideoCapture(video_file)
+        print("frame count:", int(VidObj.get(cv2.CAP_PROP_FRAME_COUNT)))
         VidObj.set(cv2.CAP_PROP_POS_MSEC, 0)
         success, frame = VidObj.read()
+        print('read vid', success)
         frames = list()
+        cont = 0
         while success:
             frame = cv2.cvtColor(np.array(frame), cv2.COLOR_BGR2RGB)
             frame = np.asarray(frame)
             frames.append(frame)
             success, frame = VidObj.read()
+            print(f'read frame {cont}', success)
+            cont+=1
+        print('frames', np.asarray(frames).shape)
         return np.asarray(frames)
 
     @staticmethod

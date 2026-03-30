@@ -207,9 +207,12 @@ class BaseLoader(Dataset):
             begin(float): index of begining during train/val split.
             end(float): index of ending during train/val split.
         """
+        print('data dirs', data_dirs)
         data_dirs_split = self.split_raw_data(data_dirs, begin, end)  # partition dataset 
+        print('data dirs splt', data_dirs_split)
         # send data directories to be processed
         file_list_dict = self.multi_process_manager(data_dirs_split, config_preprocess) 
+        print('calling build file list', file_list_dict)
         self.build_file_list(file_list_dict)  # build file list
         self.load_preprocessed_data()  # load all data and corresponding labels (sorted for consistency)
         print("Total Number of raw files preprocessed:", len(data_dirs_split), end='\n\n')
@@ -486,6 +489,7 @@ class BaseLoader(Dataset):
         """
         print('Preprocessing dataset...')
         file_num = len(data_dirs)
+        print('file num', file_num)
         choose_range = range(0, file_num)
         pbar = tqdm(list(choose_range))
 
@@ -519,6 +523,8 @@ class BaseLoader(Dataset):
             pbar.update(1)
         pbar.close()
 
+        print('mulit process manager', file_list_dict)
+
         return file_list_dict
 
     def build_file_list(self, file_list_dict):
@@ -531,12 +537,16 @@ class BaseLoader(Dataset):
             None (this function does save a file-list .csv file to self.file_list_path)
         """
         file_list = []
+        print('file list dict', file_list_dict)
         # iterate through processes and add all processed file paths
         for process_num, file_paths in file_list_dict.items():
             file_list = file_list + file_paths
 
         if not file_list:
-            raise ValueError(self.dataset_name, 'No files in file list')
+            if not file_list_dict:
+                raise ValueError(f"Loader '{self.dataset_name}': No videos found to process. Please check if DATA_PATH is correct and BEGIN/END [{self.config_data.BEGIN}, {self.config_data.END}] covers available subjects in {self.raw_data_path}.")
+            else:
+                raise ValueError(f"Loader '{self.dataset_name}': Processing found no valid clips. This usually means your videos are shorter than your CHUNK_LENGTH ({self.config_data.PREPROCESS.CHUNK_LENGTH} frames). Try reducing CHUNK_LENGTH or setting DO_CHUNK to False.")
 
         file_list_df = pd.DataFrame(file_list, columns=['input_files'])
         os.makedirs(os.path.dirname(self.file_list_path), exist_ok=True)
