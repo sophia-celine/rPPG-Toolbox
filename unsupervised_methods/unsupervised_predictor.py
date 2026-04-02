@@ -54,6 +54,15 @@ def unsupervised_predict(config, data_loader, method_name):
             plt.savefig(f'hr_results/spectrogram_{method_name}_{it}_{idx}.png')
             plt.close()
 
+            plt.figure()
+            plt.plot(BVP)
+            plt.title(f'BVP {method_name}')
+            # plt.xlabel('Time (s)')
+            # plt.ylabel('BVP')
+            plt.savefig(f'BVPresults/BVP_{method_name}_{it}_{idx}.png')
+            plt.close()
+            np.savetxt(f'BVPresults/BVP_{method_name}_{it}_{idx}.txt', BVP, fmt='%.7e')
+
             # np.savetxt(f"BVP_{method_name}_{it}.txt", BVP, fmt='%.7e')
             video_frame_size = test_batch[0].shape[1]
             if config.INFERENCE.EVALUATION_WINDOW.USE_SMALLER_WINDOW:
