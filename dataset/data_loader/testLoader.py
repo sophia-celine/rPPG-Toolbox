@@ -62,54 +62,76 @@ class testLoader(BaseLoader):
 
     def preprocess_dataset_subprocess(self, data_dirs, config_preprocess, i, file_list_dict):
         """ invoked by preprocess_dataset for multi_process."""
-        filename = os.path.split(data_dirs[i]['path'])[-1]
-        saved_filename = data_dirs[i]['index']
-        print('test loader', saved_filename)
+        try:
+            filename = os.path.split(data_dirs[i]['path'])[-1]
+            saved_filename = data_dirs[i]['index']
+            print(f'Test loader processing: {saved_filename}')
 
-        # Read Frames
-        if 'None' in config_preprocess.DATA_AUG:
-            # Utilize dataset-specific function to read video
-            frames = self.read_video(
-                os.path.join(data_dirs[i]['path'],"vid.avi"))
-            print('frames', frames.shape)
-        elif 'Motion' in config_preprocess.DATA_AUG:
-            # Utilize general function to read video in .npy format
-            frames = self.read_npy_video(
-                glob.glob(os.path.join(data_dirs[i]['path'],'*.npy')))
-        else:
-            raise ValueError(f'Unsupported DATA_AUG specified for {self.dataset_name} dataset! Received {config_preprocess.DATA_AUG}.')
+            # Read Frames
+            if 'None' in config_preprocess.DATA_AUG:
+                # Utilize dataset-specific function to read video
+                frames = self.read_video(
+                    os.path.join(data_dirs[i]['path'],"vid.avi"))
+            elif 'Motion' in config_preprocess.DATA_AUG:
+                # Utilize general function to read video in .npy format
+                frames = self.read_npy_video(
+                    glob.glob(os.path.join(data_dirs[i]['path'],'*.npy')))
+            else:
+                raise ValueError(f'Unsupported DATA_AUG specified for {self.dataset_name} dataset! Received {config_preprocess.DATA_AUG}.')
 
-        # Read Labels
-        if config_preprocess.USE_PSUEDO_PPG_LABEL:
-            bvps = self.generate_pos_psuedo_labels(frames, fs=self.config_data.FS)
-        else:
-            bvps = self.read_wave(
-                os.path.join(data_dirs[i]['path'],"ground_truth.txt"))
+            # Read Labels
+            if config_preprocess.USE_PSUEDO_PPG_LABEL:
+                bvps = self.generate_pos_psuedo_labels(frames, fs=self.config_data.FS)
+            else:
+                bvps = self.read_wave(
+                    os.path.join(data_dirs[i]['path'],"ground_truth.txt"))
             
-        frames_clips, bvps_clips = self.preprocess(frames, bvps, config_preprocess)
-        input_name_list, label_name_list = self.save_multi_process(frames_clips, bvps_clips, saved_filename)
-        file_list_dict[i] = input_name_list
+            # Common fix: ensure label length matches frame count before chunking
+            if len(bvps) != frames.shape[0]:
+                bvps = BaseLoader.resample_ppg(bvps, frames.shape[0])
+                
+            frames_clips, bvps_clips = self.preprocess(frames, bvps, config_preprocess)
+            input_name_list, label_name_list = self.save_multi_process(frames_clips, bvps_clips, saved_filename)
+            file_list_dict[i] = input_name_list
+            print(f"Successfully finished processing {saved_filename}")
+
+        except Exception as e:
+            print(f"\n[ERROR] Subprocess {i} failed for {data_dirs[i]['path']}: {e}")
+            import traceback
+            traceback.print_exc()
 
     @staticmethod
     def read_video(video_file):
         """Reads a video file, returns frames(T, H, W, 3) """
-        print('video file', video_file)
         VidObj = cv2.VideoCapture(video_file)
-        print("frame count:", int(VidObj.get(cv2.CAP_PROP_FRAME_COUNT)))
+        total_frames = int(VidObj.get(cv2.CAP_PROP_FRAME_COUNT))
+        width = int(VidObj.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(VidObj.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        print(f"Reading {video_file}: {total_frames} frames at {width}x{height}")
+        
         VidObj.set(cv2.CAP_PROP_POS_MSEC, 0)
-        success, frame = VidObj.read()
-        print('read vid', success)
-        frames = list()
-        cont = 0
-        while success:
-            frame = cv2.cvtColor(np.array(frame), cv2.COLOR_BGR2RGB)
-            frame = np.asarray(frame)
-            frames.append(frame)
-            success, frame = VidObj.read()
-            print(f'read frame {cont}', success)
-            cont+=1
-        print('frames', np.asarray(frames).shape)
-        return np.asarray(frames)
+
+        # Optimization: Pre-allocate array to prevent OOM crash during conversion
+        if total_frames > 0:
+            frames = np.zeros((total_frames, height, width, 3), dtype=np.uint8)
+            for i in range(total_frames):
+                success, frame = VidObj.read()
+                if not success:
+                    frames = frames[:i] # Truncate if codec lied about frame count
+                    break
+                frames[i] = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        else:
+            # Fallback if frame count is unknown
+            frames_list = []
+            while True:
+                success, frame = VidObj.read()
+                if not success: break
+                frames_list.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            frames = np.asarray(frames_list)
+
+        VidObj.release()
+        print(f'Finished reading video. Array shape: {frames.shape}')
+        return frames
 
     @staticmethod
     def read_wave(bvp_file):
