@@ -45,20 +45,23 @@ def unsupervised_predict(config, data_loader, method_name):
                 BVP = OMIT(data_input)
             else:
                 raise ValueError("unsupervised method name wrong!")
+            
+            [b, a] = butter(1, [0.6 / config.UNSUPERVISED.DATA.FS * 2, 3.3 / config.UNSUPERVISED.DATA.FS * 2], btype='bandpass')
+            BVP = scipy.signal.filtfilt(b, a, np.double(BVP))
 
             plt.figure()
             plt.specgram(BVP, Fs=config.UNSUPERVISED.DATA.FS)
-            plt.title(f'{method_name} Spectrogram')
-            plt.xlabel('Time (s)')
-            plt.ylabel('Frequency (Hz)')
+            plt.title(f'{method_name}')
+            plt.xlabel('Tempo (s)')
+            plt.ylabel('Frequência (Hz)')
             plt.savefig(f'hr_results/spectrogram_{method_name}_{it}_{idx}.png')
             plt.close()
 
             plt.figure()
             plt.plot(BVP)
             plt.title(f'BVP {method_name}')
-            # plt.xlabel('Time (s)')
-            # plt.ylabel('BVP')
+            plt.xlabel('Amostra')
+            plt.ylabel('Amplitude')
             plt.savefig(f'BVPresults/BVP_{method_name}_{it}_{idx}.png')
             plt.close()
             np.savetxt(f'BVPresults/BVP_{method_name}_{it}_{idx}.txt', BVP, fmt='%.7e')

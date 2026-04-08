@@ -71,7 +71,9 @@ class testLoader(BaseLoader):
             if 'None' in config_preprocess.DATA_AUG:
                 # Utilize dataset-specific function to read video
                 frames = self.read_video(
-                    os.path.join(data_dirs[i]['path'],"vid.avi"))
+                    os.path.join(data_dirs[i]['path'],"vid.avi"),
+                    width=520,
+                    height=520)
             elif 'Motion' in config_preprocess.DATA_AUG:
                 # Utilize general function to read video in .npy format
                 frames = self.read_npy_video(
@@ -101,13 +103,13 @@ class testLoader(BaseLoader):
             traceback.print_exc()
 
     @staticmethod
-    def read_video(video_file):
+    def read_video(video_file, width=128, height=128):
         """Reads a video file, returns frames(T, H, W, 3) """
         VidObj = cv2.VideoCapture(video_file)
         total_frames = int(VidObj.get(cv2.CAP_PROP_FRAME_COUNT))
-        width = int(VidObj.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(VidObj.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        print(f"Reading {video_file}: {total_frames} frames at {width}x{height}")
+        orig_width = int(VidObj.get(cv2.CAP_PROP_FRAME_WIDTH))
+        orig_height = int(VidObj.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        print(f"Reading {video_file}: {total_frames} frames. Resizing from {orig_width}x{orig_height} to {width}x{height}")
         
         VidObj.set(cv2.CAP_PROP_POS_MSEC, 0)
 
@@ -119,14 +121,16 @@ class testLoader(BaseLoader):
                 if not success:
                     frames = frames[:i] # Truncate if codec lied about frame count
                     break
-                frames[i] = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                resized_frame = cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
+                frames[i] = cv2.cvtColor(resized_frame, cv2.COLOR_BGR2RGB)
         else:
             # Fallback if frame count is unknown
             frames_list = []
             while True:
                 success, frame = VidObj.read()
                 if not success: break
-                frames_list.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                resized_frame = cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
+                frames_list.append(cv2.cvtColor(resized_frame, cv2.COLOR_BGR2RGB))
             frames = np.asarray(frames_list)
 
         VidObj.release()
