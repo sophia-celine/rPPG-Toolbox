@@ -12,6 +12,13 @@ from tqdm import tqdm
 from evaluation.BlandAltmanPy import BlandAltman
 import matplotlib.pyplot as plt
 
+# Define all unsupervised methods for combined plotting
+ALL_UNSUPERVISED_METHODS = ["POS", "CHROM", "ICA", "GREEN", "LGI", "PBV", "OMIT"]
+# Determine subplot grid dimensions (e.g., 2 rows, 4 columns for 7 methods)
+N_ROWS_SPECTROGRAM_PLOT = (len(ALL_UNSUPERVISED_METHODS) + 3) // 4 # Ceiling division for rows
+N_COLS_SPECTROGRAM_PLOT = 4 # Fixed columns for better layout
+
+
 def unsupervised_predict(config, data_loader, method_name):
     """ Model evaluation on the testing dataset."""
     if data_loader["unsupervised"] is None:
@@ -29,33 +36,61 @@ def unsupervised_predict(config, data_loader, method_name):
         for idx in range(batch_size):
             data_input, labels_input = test_batch[0][idx].cpu().numpy(), test_batch[1][idx].cpu().numpy()
             data_input = data_input[..., :3]
-            if method_name == "POS":
-                BVP = POS_WANG(data_input, config.UNSUPERVISED.DATA.FS)
-            elif method_name == "CHROM":
-                BVP = CHROME_DEHAAN(data_input, config.UNSUPERVISED.DATA.FS)
-            elif method_name == "ICA":
-                BVP = ICA_POH(data_input, config.UNSUPERVISED.DATA.FS)
-            elif method_name == "GREEN":
-                BVP = GREEN(data_input)
-            elif method_name == "LGI":
-                BVP = LGI(data_input)
-            elif method_name == "PBV":
-                BVP = PBV(data_input)
-            elif method_name == "OMIT":
-                BVP = OMIT(data_input)
-            else:
-                raise ValueError("unsupervised method name wrong!")
             
             [b, a] = butter(1, [0.6 / config.UNSUPERVISED.DATA.FS * 2, 3.3 / config.UNSUPERVISED.DATA.FS * 2], btype='bandpass')
-            BVP = scipy.signal.filtfilt(b, a, np.double(BVP))
+            bvp_signals_for_all_methods = {}
+            bvp_for_current_method_arg = None # This will store the BVP for the method_name passed to the function
 
-            plt.figure()
-            plt.specgram(BVP, Fs=config.UNSUPERVISED.DATA.FS)
-            plt.title(f'{method_name}')
-            plt.xlabel('Tempo (s)')
-            plt.ylabel('Frequência (Hz)')
-            plt.savefig(f'hr_results/spectrogram_{method_name}_{it}_{idx}.png')
-            plt.close()
+             # Calculate BVP for all methods for spectrogram plotting and also identify the one for metrics
+            for current_method_name_iter in ALL_UNSUPERVISED_METHODS:
+                BVP = None
+                if current_method_name_iter == "POS":
+                    BVP = POS_WANG(data_input, config.UNSUPERVISED.DATA.FS)
+                elif current_method_name_iter == "CHROM":
+                    BVP = CHROME_DEHAAN(data_input, config.UNSUPERVISED.DATA.FS)
+                elif current_method_name_iter == "ICA":
+                    BVP = ICA_POH(data_input, config.UNSUPERVISED.DATA.FS)
+                elif current_method_name_iter == "GREEN":
+                    BVP = GREEN(data_input)
+                elif current_method_name_iter == "LGI":
+                    BVP = LGI(data_input)
+                elif current_method_name_iter == "PBV":
+                    BVP = PBV(data_input)
+                elif current_method_name_iter == "OMIT":
+                    BVP = OMIT(data_input)
+                else:
+                    raise ValueError(f"Unsupervised method name '{current_method_name_iter}' not recognized!")
+                
+                BVP_filtered = scipy.signal.filtfilt(b, a, np.double(BVP))
+                
+                bvp_signals_for_all_methods[current_method_name_iter] = BVP_filtered
+
+                # If this BVP corresponds to the method_name argument, store it for later metrics
+                if current_method_name_iter == method_name:
+                    bvp_for_current_method_arg = BVP_filtered
+            
+            # Check if the BVP for the specified method_name was found
+            if bvp_for_current_method_arg is None:
+                raise ValueError(f"BVP signal for method '{method_name}' (from function argument) was not generated. "
+                                 "Ensure it's in 'ALL_UNSUPERVISED_METHODS' list.")
+
+            # --- Combined Spectrogram Plotting ---
+            fig, axes = plt.subplots(N_ROWS_SPECTROGRAM_PLOT, N_COLS_SPECTROGRAM_PLOT, figsize=(N_COLS_SPECTROGRAM_PLOT * 4, N_ROWS_SPECTROGRAM_PLOT * 3), sharex=True, sharey=True)
+            axes = axes.flatten()
+
+            for i, (method_name_key, BVP_signal_to_plot) in enumerate(bvp_signals_for_all_methods.items()):
+                ax = axes[i]
+                ax.specgram(BVP_signal_to_plot, Fs=config.UNSUPERVISED.DATA.FS)
+                ax.set_title(f'{method_name_key}', fontsize=10)
+                if i % N_COLS_SPECTROGRAM_PLOT == 0: ax.set_ylabel('Frequência (Hz)', fontsize=8)
+                if i >= (N_ROWS_SPECTROGRAM_PLOT - 1) * N_COLS_SPECTROGRAM_PLOT: ax.set_xlabel('Tempo (s)', fontsize=8)
+                ax.tick_params(axis='both', which='major', labelsize=7)
+            for j in range(len(ALL_UNSUPERVISED_METHODS), len(axes)): fig.delaxes(axes[j]) # Hide unused subplots
+            plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+            # plt.suptitle(f'Espectrogramas BVP para todos os métodos ({it}_{idx})', fontsize=14)
+            plt.savefig(f'hr_results/spectrograms_all_methods_{it}_{idx}.png')
+            plt.close(fig)
+            # -------------------------------------
 
             plt.figure()
             plt.plot(BVP)
