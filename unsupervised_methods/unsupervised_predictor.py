@@ -92,16 +92,64 @@ def unsupervised_predict(config, data_loader, method_name):
             plt.close(fig)
             # -------------------------------------
 
+            # Plot and save the BVP signal for the specific method requested
             plt.figure()
-            plt.plot(BVP)
+            plt.plot(bvp_for_current_method_arg)
             plt.title(f'BVP {method_name}')
             plt.xlabel('Amostra')
             plt.ylabel('Amplitude')
-            plt.savefig(f'BVPresults/BVP_{method_name}_{it}_{idx}.png')
+            plt.savefig(f'BVPresults/BVP_{method_name}_{it}_{idx}.png') # Isso salvará o gráfico para o método específico
             plt.close()
-            np.savetxt(f'BVPresults/BVP_{method_name}_{it}_{idx}.txt', BVP, fmt='%.7e')
+            np.savetxt(f'BVPresults/BVP_{method_name}_{it}_{idx}.txt', bvp_for_current_method_arg, fmt='%.7e') # Isso salvará os dados para o método específico
 
-            # np.savetxt(f"BVP_{method_name}_{it}.txt", BVP, fmt='%.7e')
+            # --- Plotagem do Espectro de Frequência ---
+            fig_freq, axes_freq = plt.subplots(N_ROWS_SPECTROGRAM_PLOT, N_COLS_SPECTROGRAM_PLOT, 
+                                              figsize=(N_COLS_SPECTROGRAM_PLOT * 4, N_ROWS_SPECTROGRAM_PLOT * 3), 
+                                              sharex=True)
+            axes_freq = axes_freq.flatten()
+            # Definir o intervalo de frequência em BPM para o plot (equivalente ao filtro passa-banda)
+            min_hr_bpm = 0.6 * 60
+            max_hr_bpm = 3.3 * 60
+
+            for i, (method_name_key, BVP_signal_to_plot) in enumerate(bvp_signals_for_all_methods.items()):
+                ax = axes_freq[i]
+                fs = config.UNSUPERVISED.DATA.FS
+                f, Pxx = scipy.signal.periodogram(BVP_signal_to_plot, fs=fs)
+                f_bpm = f * 60
+                mask = (f_bpm >= min_hr_bpm) & (f_bpm <= max_hr_bpm)
+                
+                ax.plot(f_bpm[mask], Pxx[mask])
+                ax.set_title(method_name_key, fontsize=10)
+                ax.grid(True)
+                if i % N_COLS_SPECTROGRAM_PLOT == 0: ax.set_ylabel('PSD', fontsize=8)
+                if i >= (N_ROWS_SPECTROGRAM_PLOT - 1) * N_COLS_SPECTROGRAM_PLOT: ax.set_xlabel('Frequência (BPM)', fontsize=8)
+                ax.tick_params(axis='both', which='major', labelsize=7)
+
+            for j in range(len(ALL_UNSUPERVISED_METHODS), len(axes_freq)): fig_freq.delaxes(axes_freq[j])
+            plt.tight_layout()
+            plt.savefig(f'hr_results/frequency_spectrum_all_methods_{it}_{idx}.png')
+            plt.close(fig_freq)
+            # -------------------------------------
+
+            # --- Plotagem das Ondas BVP Filtradas (Sinal Temporal) ---
+            fig_waves, axes_waves = plt.subplots(N_ROWS_SPECTROGRAM_PLOT, N_COLS_SPECTROGRAM_PLOT, 
+                                                figsize=(N_COLS_SPECTROGRAM_PLOT * 4, N_ROWS_SPECTROGRAM_PLOT * 3), 
+                                                sharex=True)
+            axes_waves = axes_waves.flatten()
+            for i, (method_name_key, BVP_signal_to_plot) in enumerate(bvp_signals_for_all_methods.items()):
+                ax = axes_waves[i]
+                ax.plot(BVP_signal_to_plot, color='tab:red')
+                ax.set_title(method_name_key, fontsize=10)
+                ax.grid(True, linestyle='--', alpha=0.6)
+                if i % N_COLS_SPECTROGRAM_PLOT == 0: ax.set_ylabel('Amplitude', fontsize=8)
+                if i >= (N_ROWS_SPECTROGRAM_PLOT - 1) * N_COLS_SPECTROGRAM_PLOT: ax.set_xlabel('Amostra', fontsize=8)
+                ax.tick_params(axis='both', which='major', labelsize=7)
+            for j in range(len(ALL_UNSUPERVISED_METHODS), len(axes_waves)): fig_waves.delaxes(axes_waves[j])
+            plt.tight_layout()
+            plt.savefig(f'hr_results/bvp_waves_all_methods_{it}_{idx}.png')
+            plt.close(fig_waves)
+            # -------------------------------------
+
             video_frame_size = test_batch[0].shape[1]
             if config.INFERENCE.EVALUATION_WINDOW.USE_SMALLER_WINDOW:
                 window_frame_size = config.INFERENCE.EVALUATION_WINDOW.WINDOW_SIZE * config.UNSUPERVISED.DATA.FS
@@ -111,8 +159,9 @@ def unsupervised_predict(config, data_loader, method_name):
                 window_frame_size = video_frame_size
 
             for i in range(0, len(BVP), window_frame_size):
-                # print('\nwindow')
-                BVP_window = BVP[i:i+window_frame_size]
+                # Correção: Usar o sinal BVP do método atual para o cálculo das métricas,
+                # em vez do último BVP calculado no loop de todos os métodos.
+                BVP_window = bvp_for_current_method_arg[i:i+window_frame_size]
                 label_window = labels_input[i:i+window_frame_size]
 
                 if len(BVP_window) < 9:
