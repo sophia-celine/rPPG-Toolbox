@@ -93,13 +93,13 @@ def unsupervised_predict(config, data_loader, method_name):
             # -------------------------------------
 
             # Plot and save the BVP signal for the specific method requested
-            plt.figure()
-            plt.plot(bvp_for_current_method_arg)
-            plt.title(f'BVP {method_name}')
-            plt.xlabel('Amostra')
-            plt.ylabel('Amplitude')
-            plt.savefig(f'BVPresults/BVP_{method_name}_{it}_{idx}.png') # Isso salvará o gráfico para o método específico
-            plt.close()
+            # plt.figure()
+            # plt.plot(bvp_for_current_method_arg)
+            # plt.title(f'BVP {method_name}')
+            # plt.xlabel('Amostra')
+            # plt.ylabel('Amplitude')
+            # plt.savefig(f'BVPresults/BVP_{method_name}_{it}_{idx}.png') # Isso salvará o gráfico para o método específico
+            # plt.close()
             np.savetxt(f'BVPresults/BVP_{method_name}_{it}_{idx}.txt', bvp_for_current_method_arg, fmt='%.7e') # Isso salvará os dados para o método específico
 
             # --- Plotagem do Espectro de Frequência ---
