@@ -6,7 +6,7 @@ UNSUPERVISED:
   DATA:
     INFO:
       SKIN_COLOR: [1, 2, 3, 4] 
-    FS: 50
+    FS: 25
     DATASET: test
     DO_PREPROCESS: True               # if first time, should be true
     DATA_FORMAT: NDHWC
