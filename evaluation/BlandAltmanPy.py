@@ -83,7 +83,11 @@ class BlandAltman():
         return stats_dict
 
     def rand_jitter(self, arr):
-        stdev = .01 * (max(arr) - min(arr))
+        data_range = max(arr) - min(arr)
+        if data_range == 0:
+            stdev = 1e-4  # Use a small constant jitter if data is constant
+        else:
+            stdev = .01 * data_range
         return arr + np.random.randn(len(arr)) * stdev
 
     def scatter_plot(self,x_label='Gold Standard',y_label='New Measure',
@@ -103,7 +107,11 @@ class BlandAltman():
         fig = plt.figure(figsize=figure_size)
         ax=fig.add_axes([0,0,1,1])
         xy = np.vstack([self.gold_std,self.new_measure])
-        z = gaussian_kde(xy)(xy)
+        try:
+            z = gaussian_kde(xy)(xy)
+        except (np.linalg.LinAlgError, ValueError):
+            # Fallback if KDE fails due to singular matrix or insufficient points
+            z = None
         ax.scatter(self.gold_std,self.new_measure, c=z, s=50)
         x_vals = np.array(ax.get_xlim())
         ax.plot(x_vals,x_vals,'--',color='black', label='Line of Slope = 1')
@@ -132,7 +140,11 @@ class BlandAltman():
         fig = plt.figure(figsize=figure_size)
         ax = fig.add_axes([0,0,1,1])
         xy = np.vstack([avgs,diffs])
-        z = gaussian_kde(xy)(xy)
+        try:
+            z = gaussian_kde(xy)(xy)
+        except (np.linalg.LinAlgError, ValueError):
+            # Fallback if KDE fails
+            z = None
         ax.scatter(avgs,diffs, c=z, label='Observations')
         x_vals = np.array(ax.get_xlim())
         ax.axhline(self.mean_error,color='black',label='Mean Error')

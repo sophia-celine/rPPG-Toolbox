@@ -21,11 +21,12 @@ from scipy import signal
 from scipy import sparse
 
 
-data_out_path = "/home/sophia/rPPG-Toolbox/runs/exp/test_SizeW72_SizeH72_ClipLength180_DataTypeDiffNormalized_Standardized_DataAugNone_LabelTypeDiffNormalized_Crop_faceTrue_BackendHC_Large_boxTrue_Large_size1.5_Dyamic_DetTrue_det_len25_Median_face_boxFalse/saved_test_outputs/PURE_DeepPhys_test_outputs.pickle"  # Output Data Path 
+data_out_path = "/home/soph/rppg/rPPG-Toolbox/runs/exp/test_SizeW72_SizeH72_ClipLength180_DataTypeStandardized_DataAugNone_LabelTypeDiffNormalized_Crop_faceTrue_BackendY5F_Large_boxFalse_Large_size1.5_Dyamic_DetTrue_det_len25_Median_face_boxFalse/saved_test_outputs/UBFC-rPPG_EfficientPhys_test_outputs.pickle"
 trial_idx = 0
 chunk_size = 360 # size of chunk to visualize: -1 will plot the entire signal
 chunk_num = 0
-model = "DeepPhys_PURE"
+model = "EfficientPhysUBFC-rPPG"
+path = "/home/soph/rppg/rPPG/preliminary_results/vin019/bvp_dl"
 
 # HELPER FUNCTIONS
 
@@ -93,6 +94,8 @@ if chunk_size == -1:
 prediction = _process_signal(prediction, fs, diff_flag=diff_flag)
 
 np.savetxt(f"../../BVPresults/BVP_{model}_{trial_list[0]}.txt", prediction, fmt='%.7e')
+print(f"{path}/BVP_{model}_{trial_list[0]}.txt")
+np.savetxt(f"{path}/BVP_{model}_{trial_list[0]}.txt", prediction, fmt='%.7e')
 
 plt.plot(prediction)
 plt.show()

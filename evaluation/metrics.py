@@ -5,6 +5,9 @@ from evaluation.post_process import *
 from tqdm import tqdm
 from evaluation.BlandAltmanPy import BlandAltman
 
+hr_txt_path = "/home/soph/rppg/rPPG/preliminary_results/vin019/dl_hr_preds"
+hr_txt_name = "EfficientPhysUBFC-rPPG"
+
 def read_label(dataset):
     """Read manually corrected labels."""
     df = pd.read_csv("label/{0}_Comparison.csv".format(dataset))
@@ -112,6 +115,7 @@ def calculate_metrics(predictions, labels, config):
         MACC_all = np.array(MACC_all)
         num_test_samples = len(predict_hr_fft_all)
         np.savetxt(f"hr_results/HR_{config.MODEL.NAME}.txt", predict_hr_fft_all, fmt='%.7e')
+        np.savetxt(f"{hr_txt_path}/HR_{hr_txt_name}.txt", predict_hr_fft_all, fmt='%.7e')
         np.savetxt(f"hr_results/GT_HR_{config.MODEL.NAME}.txt", gt_hr_fft_all, fmt='%.7e')
         for metric in config.TEST.METRICS:
             if metric == "MAE":
@@ -133,8 +137,11 @@ def calculate_metrics(predictions, labels, config):
             elif metric == "Pearson":
                 Pearson_FFT = np.corrcoef(predict_hr_fft_all, gt_hr_fft_all)
                 correlation_coefficient = Pearson_FFT[0][1]
-                standard_error = np.sqrt((1 - correlation_coefficient**2) / (num_test_samples - 2))
-                print("FFT Pearson (FFT Label): {0} +/- {1}".format(correlation_coefficient, standard_error))
+                if np.isnan(correlation_coefficient):
+                    print("FFT Pearson (FFT Label): N/A (Zero variance in data)")
+                else:
+                    standard_error = np.sqrt((1 - correlation_coefficient**2) / (num_test_samples - 2))
+                    print("FFT Pearson (FFT Label): {0} +/- {1}".format(correlation_coefficient, standard_error))
             elif metric == "SNR":
                 SNR_FFT = np.mean(SNR_all)
                 standard_error = np.std(SNR_all) / np.sqrt(num_test_samples)
@@ -187,8 +194,11 @@ def calculate_metrics(predictions, labels, config):
             elif metric == "Pearson":
                 Pearson_PEAK = np.corrcoef(predict_hr_peak_all, gt_hr_peak_all)
                 correlation_coefficient = Pearson_PEAK[0][1]
-                standard_error = np.sqrt((1 - correlation_coefficient**2) / (num_test_samples - 2))
-                print("PEAK Pearson (Peak Label): {0} +/- {1}".format(correlation_coefficient, standard_error))
+                if np.isnan(correlation_coefficient):
+                    print("PEAK Pearson (Peak Label): N/A (Zero variance in data)")
+                else:
+                    standard_error = np.sqrt((1 - correlation_coefficient**2) / (num_test_samples - 2))
+                    print("PEAK Pearson (Peak Label): {0} +/- {1}".format(correlation_coefficient, standard_error))
             elif metric == "SNR":
                 SNR_PEAK = np.mean(SNR_all)
                 standard_error = np.std(SNR_all) / np.sqrt(num_test_samples)
