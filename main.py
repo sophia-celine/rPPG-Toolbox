@@ -279,6 +279,8 @@ if __name__ == "__main__":
             test_loader = data_loader.SUMSLoader.SUMSLoader
         elif config.TEST.DATA.DATASET == "test":
             test_loader = data_loader.testLoader.testLoader
+        elif config.TEST.DATA.DATASET == "ICU":
+            test_loader = data_loader.ICULoader.ICULoader
         else:
             raise ValueError("Unsupported dataset! Currently supporting UBFC-rPPG, PURE, MMPD, \
                              SCAMPS, BP4D+ (Normal and BigSmall preprocessing), UBFC-PHYS and iBVP.")

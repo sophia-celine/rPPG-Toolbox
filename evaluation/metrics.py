@@ -114,9 +114,9 @@ def calculate_metrics(predictions, labels, config):
         SNR_all = np.array(SNR_all)
         MACC_all = np.array(MACC_all)
         num_test_samples = len(predict_hr_fft_all)
-        np.savetxt(f"hr_results/HR_{config.MODEL.NAME}.txt", predict_hr_fft_all, fmt='%.7e')
-        np.savetxt(f"{hr_txt_path}/HR_{hr_txt_name}.txt", predict_hr_fft_all, fmt='%.7e')
-        np.savetxt(f"hr_results/GT_HR_{config.MODEL.NAME}.txt", gt_hr_fft_all, fmt='%.7e')
+        # np.savetxt(f"hr_results/HR_{config.MODEL.NAME}.txt", predict_hr_fft_all, fmt='%.7e')
+        # np.savetxt(f"{hr_txt_path}/HR_{hr_txt_name}.txt", predict_hr_fft_all, fmt='%.7e')
+        # np.savetxt(f"hr_results/GT_HR_{config.MODEL.NAME}.txt", gt_hr_fft_all, fmt='%.7e')
         for metric in config.TEST.METRICS:
             if metric == "MAE":
                 MAE_FFT = np.mean(np.abs(predict_hr_fft_all - gt_hr_fft_all))
