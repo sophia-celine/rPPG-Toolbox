@@ -20,5 +20,5 @@ debug_utils_physnet.py
 test.yaml
 *.out
 /data
-BVPresults
-hr_results
+/BVPresults
+/hr_results
