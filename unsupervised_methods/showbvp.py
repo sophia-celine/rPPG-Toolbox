@@ -1,20 +1,56 @@
-import numpy as np
-import matplotlib.pyplot as plt
 from pathlib import Path
-import scipy
+import re
+import numpy as np
+import scipy.signal
+import matplotlib.pyplot as plt
 from scipy.signal import butter
 
-fs = 30
+fs = 30  # adjust to your sampling frequency
 
+folder_path = Path('/home/sophia/rPPG-Toolbox/BVPresults')
 
-# bvp_data = '/home/sophia/rPPG-Toolbox/BVPresults/BVP_GREEN_1_0.txt'
-bvp_data = '/home/sophia/rPPG-Toolbox/BVPresults/BVP_POS_0_0.txt'
+selected_methods = [
+    "POS"
+]
 
-sinal = np.loadtxt(bvp_data)
-metodo = Path(bvp_data).name.split("BVP_")[1].split("_0_0")[0]
-[b, a] = butter(1, [0.6 / fs * 2, 3.3 / fs * 2], btype='bandpass')
-sinal = scipy.signal.filtfilt(b, a, np.double(sinal))
+files = []
 
-plt.plot(sinal)
-plt.title(metodo)
-plt.show()
+for file_path in folder_path.glob("BVP_*.txt"):
+    match = re.match(r"BVP_(.*?)_(subject\d+)\.txt", file_path.name)
+
+    if match:
+        method = match.group(1)
+        subject = match.group(2)
+
+        if method in selected_methods:
+            files.append((method, subject, file_path))
+
+# Sort by method order
+files.sort(key=lambda x: selected_methods.index(x[0]))
+
+n = len(files)
+
+if n == 0:
+    print("No matching files found.")
+else:
+    fig, axes = plt.subplots(n, 1, figsize=(12, 3 * n), sharex=True)
+
+    if n == 1:
+        axes = [axes]
+
+    b, a = butter(
+        1,
+        [0.6 / fs * 2, 3.3 / fs * 2],
+        btype="bandpass"
+    )
+
+    for ax, (method, subject, file_path) in zip(axes, files):
+        signal = np.loadtxt(file_path)
+        signal = scipy.signal.filtfilt(b, a, np.double(signal))
+
+        ax.plot(signal)
+        ax.set_title(f"{method} - {subject}")
+        ax.grid(True)
+
+    plt.tight_layout()
+    plt.show()

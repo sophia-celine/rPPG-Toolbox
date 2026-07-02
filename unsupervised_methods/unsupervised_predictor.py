@@ -72,7 +72,19 @@ def unsupervised_predict(config, data_loader, method_name):
                 raise ValueError(f"BVP signal for method '{method_name}' (from function argument) was not generated. "
                                  "Ensure it's in 'ALL_UNSUPERVISED_METHODS' list.")
 
-            np.savetxt(f'BVPresults/BVP_{method_name}_{it}_{idx}.txt', bvp_for_current_method_arg, fmt='%.7e') # Isso salvará os dados para o método específico
+            # Use the filename and chunk id provided by the dataset instead of assuming subject index == it+1
+            # `BaseLoader.__getitem__` returns (data, label, filename, chunk_id), so the DataLoader batch
+            # collates filename and chunk_id into the batch at indices 2 and 3 respectively.
+            try:
+                subject_name = test_batch[2][idx]
+                chunk_id = test_batch[3][idx]
+            except Exception:
+                # Fallback to previous behaviour if filename/chunk_id are not available
+                subject_name = f'subject{it + 1}'
+                chunk_id = '0'
+
+            out_path = f'BVPresults/BVP_{method_name}_{subject_name}.txt'
+            np.savetxt(out_path, bvp_for_current_method_arg, fmt='%.7e') # Isso salvará os dados para o método específico
 
             video_frame_size = test_batch[0].shape[1]
             if config.INFERENCE.EVALUATION_WINDOW.USE_SMALLER_WINDOW:

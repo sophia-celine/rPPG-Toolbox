@@ -8,10 +8,10 @@ UNSUPERVISED:
       SKIN_COLOR: [1, 2, 3, 4] 
     FS: 25
     DATASET: ICU
-    DO_PREPROCESS: True               # if first time, should be true
+    DO_PREPROCESS: False               # if first time, should be true
     DATA_FORMAT: NDHWC
-    DATA_PATH: "/home/soph/rppg/rPPG-Toolbox/data/ICU/RawData"                     # Raw dataset path
-    CACHED_PATH: "/home/soph/rppg/rPPG-Toolbox/data/ICU/preprocessed"    # Processed dataset save path
+    DATA_PATH: "/home/sophia/rPPG-Toolbox/data/ICU/RawData"                     # Raw dataset path
+    CACHED_PATH: "/home/sophia/rPPG-Toolbox/data/ICU/preprocessed"    # Processed dataset save path
     EXP_DATA_NAME: ""
     BEGIN: 0.0
     END: 1.0

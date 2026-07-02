@@ -68,7 +68,9 @@ class ICULoader(BaseLoader):
         if 'None' in config_preprocess.DATA_AUG:
             # Utilize dataset-specific function to read video
             frames = self.read_video(
-                os.path.join(data_dirs[i]['path'],"vid.avi"))
+                    os.path.join(data_dirs[i]['path'],"vid.avi"),
+                    width=520,
+                    height=520)
         elif 'Motion' in config_preprocess.DATA_AUG:
             # Utilize general function to read video in .npy format
             frames = self.read_npy_video(
@@ -88,18 +90,39 @@ class ICULoader(BaseLoader):
         file_list_dict[i] = input_name_list
 
     @staticmethod
-    def read_video(video_file):
+    def read_video(video_file, width=128, height=128):
         """Reads a video file, returns frames(T, H, W, 3) """
         VidObj = cv2.VideoCapture(video_file)
+        total_frames = int(VidObj.get(cv2.CAP_PROP_FRAME_COUNT))
+        orig_width = int(VidObj.get(cv2.CAP_PROP_FRAME_WIDTH))
+        orig_height = int(VidObj.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        print(f"Reading {video_file}: {total_frames} frames. Resizing from {orig_width}x{orig_height} to {width}x{height}")
+        
         VidObj.set(cv2.CAP_PROP_POS_MSEC, 0)
-        success, frame = VidObj.read()
-        frames = list()
-        while success:
-            frame = cv2.cvtColor(np.array(frame), cv2.COLOR_BGR2RGB)
-            frame = np.asarray(frame)
-            frames.append(frame)
-            success, frame = VidObj.read()
-        return np.asarray(frames)
+
+        # Optimization: Pre-allocate array to prevent OOM crash during conversion
+        if total_frames > 0:
+            frames = np.zeros((total_frames, height, width, 3), dtype=np.uint8)
+            for i in range(total_frames):
+                success, frame = VidObj.read()
+                if not success:
+                    frames = frames[:i] # Truncate if codec lied about frame count
+                    break
+                resized_frame = cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
+                frames[i] = cv2.cvtColor(resized_frame, cv2.COLOR_BGR2RGB)
+        else:
+            # Fallback if frame count is unknown
+            frames_list = []
+            while True:
+                success, frame = VidObj.read()
+                if not success: break
+                resized_frame = cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
+                frames_list.append(cv2.cvtColor(resized_frame, cv2.COLOR_BGR2RGB))
+            frames = np.asarray(frames_list)
+
+        VidObj.release()
+        print(f'Finished reading video. Array shape: {frames.shape}')
+        return frames
 
     @staticmethod
     def read_wave(bvp_file):
