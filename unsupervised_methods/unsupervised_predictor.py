@@ -33,11 +33,11 @@ def unsupervised_predict(config, data_loader, method_name):
     sbar = tqdm(data_loader["unsupervised"], ncols=80)
     for it, test_batch in enumerate(sbar):
         batch_size = test_batch[0].shape[0]
+        print('-------------- batch size -----------------', batch_size)
         for idx in range(batch_size):
             data_input, labels_input = test_batch[0][idx].cpu().numpy(), test_batch[1][idx].cpu().numpy()
             data_input = data_input[..., :3]
             
-            [b, a] = butter(1, [0.6 / config.UNSUPERVISED.DATA.FS * 2, 3.3 / config.UNSUPERVISED.DATA.FS * 2], btype='bandpass')
             bvp_signals_for_all_methods = {}
             bvp_for_current_method_arg = None # This will store the BVP for the method_name passed to the function
 
@@ -60,95 +60,19 @@ def unsupervised_predict(config, data_loader, method_name):
                     BVP = OMIT(data_input)
                 else:
                     raise ValueError(f"Unsupervised method name '{current_method_name_iter}' not recognized!")
-                
-                BVP_filtered = scipy.signal.filtfilt(b, a, np.double(BVP))
-                
-                bvp_signals_for_all_methods[current_method_name_iter] = BVP_filtered
+                                
+                bvp_signals_for_all_methods[current_method_name_iter] = BVP
 
                 # If this BVP corresponds to the method_name argument, store it for later metrics
                 if current_method_name_iter == method_name:
-                    bvp_for_current_method_arg = BVP_filtered
+                    bvp_for_current_method_arg = BVP
             
             # Check if the BVP for the specified method_name was found
             if bvp_for_current_method_arg is None:
                 raise ValueError(f"BVP signal for method '{method_name}' (from function argument) was not generated. "
                                  "Ensure it's in 'ALL_UNSUPERVISED_METHODS' list.")
 
-            # --- Combined Spectrogram Plotting ---
-            fig, axes = plt.subplots(N_ROWS_SPECTROGRAM_PLOT, N_COLS_SPECTROGRAM_PLOT, figsize=(N_COLS_SPECTROGRAM_PLOT * 4, N_ROWS_SPECTROGRAM_PLOT * 3), sharex=True, sharey=True)
-            axes = axes.flatten()
-
-            for i, (method_name_key, BVP_signal_to_plot) in enumerate(bvp_signals_for_all_methods.items()):
-                ax = axes[i]
-                ax.specgram(BVP_signal_to_plot, Fs=config.UNSUPERVISED.DATA.FS)
-                ax.set_title(f'{method_name_key}', fontsize=10)
-                if i % N_COLS_SPECTROGRAM_PLOT == 0: ax.set_ylabel('Frequência (Hz)', fontsize=8)
-                if i >= (N_ROWS_SPECTROGRAM_PLOT - 1) * N_COLS_SPECTROGRAM_PLOT: ax.set_xlabel('Tempo (s)', fontsize=8)
-                ax.tick_params(axis='both', which='major', labelsize=7)
-            for j in range(len(ALL_UNSUPERVISED_METHODS), len(axes)): fig.delaxes(axes[j]) # Hide unused subplots
-            plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-            # plt.suptitle(f'Espectrogramas BVP para todos os métodos ({it}_{idx})', fontsize=14)
-            plt.savefig(f'hr_results/spectrograms_all_methods_{it}_{idx}.png')
-            plt.close(fig)
-            # -------------------------------------
-
-            # Plot and save the BVP signal for the specific method requested
-            # plt.figure()
-            # plt.plot(bvp_for_current_method_arg)
-            # plt.title(f'BVP {method_name}')
-            # plt.xlabel('Amostra')
-            # plt.ylabel('Amplitude')
-            # plt.savefig(f'BVPresults/BVP_{method_name}_{it}_{idx}.png') # Isso salvará o gráfico para o método específico
-            # plt.close()
             np.savetxt(f'BVPresults/BVP_{method_name}_{it}_{idx}.txt', bvp_for_current_method_arg, fmt='%.7e') # Isso salvará os dados para o método específico
-
-            # --- Plotagem do Espectro de Frequência ---
-            fig_freq, axes_freq = plt.subplots(N_ROWS_SPECTROGRAM_PLOT, N_COLS_SPECTROGRAM_PLOT, 
-                                              figsize=(N_COLS_SPECTROGRAM_PLOT * 4, N_ROWS_SPECTROGRAM_PLOT * 3), 
-                                              sharex=True)
-            axes_freq = axes_freq.flatten()
-            # Definir o intervalo de frequência em BPM para o plot (equivalente ao filtro passa-banda)
-            min_hr_bpm = 0.6 * 60
-            max_hr_bpm = 3.3 * 60
-
-            for i, (method_name_key, BVP_signal_to_plot) in enumerate(bvp_signals_for_all_methods.items()):
-                ax = axes_freq[i]
-                fs = config.UNSUPERVISED.DATA.FS
-                f, Pxx = scipy.signal.periodogram(BVP_signal_to_plot, fs=fs)
-                f_bpm = f * 60
-                mask = (f_bpm >= min_hr_bpm) & (f_bpm <= max_hr_bpm)
-                
-                ax.plot(f_bpm[mask], Pxx[mask])
-                ax.set_title(method_name_key, fontsize=10)
-                ax.grid(True)
-                if i % N_COLS_SPECTROGRAM_PLOT == 0: ax.set_ylabel('PSD', fontsize=8)
-                if i >= (N_ROWS_SPECTROGRAM_PLOT - 1) * N_COLS_SPECTROGRAM_PLOT: ax.set_xlabel('Frequência (BPM)', fontsize=8)
-                ax.tick_params(axis='both', which='major', labelsize=7)
-
-            for j in range(len(ALL_UNSUPERVISED_METHODS), len(axes_freq)): fig_freq.delaxes(axes_freq[j])
-            plt.tight_layout()
-            plt.savefig(f'hr_results/frequency_spectrum_all_methods_{it}_{idx}.png')
-            plt.close(fig_freq)
-            # -------------------------------------
-
-            # --- Plotagem das Ondas BVP Filtradas (Sinal Temporal) ---
-            fig_waves, axes_waves = plt.subplots(N_ROWS_SPECTROGRAM_PLOT, N_COLS_SPECTROGRAM_PLOT, 
-                                                figsize=(N_COLS_SPECTROGRAM_PLOT * 4, N_ROWS_SPECTROGRAM_PLOT * 3), 
-                                                sharex=True)
-            axes_waves = axes_waves.flatten()
-            for i, (method_name_key, BVP_signal_to_plot) in enumerate(bvp_signals_for_all_methods.items()):
-                ax = axes_waves[i]
-                ax.plot(BVP_signal_to_plot, color='tab:red')
-                ax.set_title(method_name_key, fontsize=10)
-                ax.grid(True, linestyle='--', alpha=0.6)
-                if i % N_COLS_SPECTROGRAM_PLOT == 0: ax.set_ylabel('Amplitude', fontsize=8)
-                if i >= (N_ROWS_SPECTROGRAM_PLOT - 1) * N_COLS_SPECTROGRAM_PLOT: ax.set_xlabel('Amostra', fontsize=8)
-                ax.tick_params(axis='both', which='major', labelsize=7)
-            for j in range(len(ALL_UNSUPERVISED_METHODS), len(axes_waves)): fig_waves.delaxes(axes_waves[j])
-            plt.tight_layout()
-            plt.savefig(f'hr_results/bvp_waves_all_methods_{it}_{idx}.png')
-            plt.close(fig_waves)
-            # -------------------------------------
 
             video_frame_size = test_batch[0].shape[1]
             if config.INFERENCE.EVALUATION_WINDOW.USE_SMALLER_WINDOW:

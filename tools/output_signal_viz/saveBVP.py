@@ -43,17 +43,14 @@ def _reform_data_from_dict(data, flatten=True):
 
     return sort_data
 
-def _process_signal(signal, fs=30, diff_flag=True):
+def _process_signal(signal, fs=30, diff_flag=True, use_bandpass=False):
     # Detrend and filter
-    use_bandpass = True
     if diff_flag:  # if the predictions and labels are 1st derivative of PPG signal.
         gt_bvp = _detrend(np.cumsum(signal), 100)
     else:
         gt_bvp = _detrend(signal, 100)
     if use_bandpass:
-        # bandpass filter between [0.75, 2.5] Hz
-        # equals [45, 150] beats per min
-        [b, a] = butter(1, [0.75 / fs * 2, 2.5 / fs * 2], btype='bandpass')
+        [b, a] = butter(1, [0.6 / fs * 2, 3.3 / fs * 2], btype='bandpass')
         signal = scipy.signal.filtfilt(b, a, np.double(signal))
     return signal
 

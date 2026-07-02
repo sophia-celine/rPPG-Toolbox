@@ -538,6 +538,7 @@ class BaseLoader(Dataset):
         """
         file_list = []
         print('file list dict', file_list_dict)
+        print(len(file_list_dict))
         # iterate through processes and add all processed file paths
         for process_num, file_paths in file_list_dict.items():
             file_list = file_list + file_paths
