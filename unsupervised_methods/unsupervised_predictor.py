@@ -87,8 +87,10 @@ def unsupervised_predict(config, data_loader, method_name):
             np.savetxt(out_path, bvp_for_current_method_arg, fmt='%.7e') # Isso salvará os dados para o método específico
 
             video_frame_size = test_batch[0].shape[1]
+            print(f"Video frame size: {video_frame_size}, Window frame size: {config.INFERENCE.EVALUATION_WINDOW.WINDOW_SIZE * config.UNSUPERVISED.DATA.FS}")
             if config.INFERENCE.EVALUATION_WINDOW.USE_SMALLER_WINDOW:
                 window_frame_size = config.INFERENCE.EVALUATION_WINDOW.WINDOW_SIZE * config.UNSUPERVISED.DATA.FS
+                print(f"Using smaller window size: {window_frame_size}")
                 if window_frame_size > video_frame_size:
                     window_frame_size = video_frame_size
             else:
@@ -97,6 +99,7 @@ def unsupervised_predict(config, data_loader, method_name):
             for i in range(0, len(BVP), window_frame_size):
                 # Correção: Usar o sinal BVP do método atual para o cálculo das métricas,
                 # em vez do último BVP calculado no loop de todos os métodos.
+                print('type', type(bvp_for_current_method_arg))
                 BVP_window = bvp_for_current_method_arg[i:i+window_frame_size]
                 label_window = labels_input[i:i+window_frame_size]
 

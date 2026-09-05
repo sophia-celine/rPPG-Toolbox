@@ -7,10 +7,11 @@ from scipy.signal import butter
 
 fs = 30  # adjust to your sampling frequency
 
-folder_path = Path('/home/sophia/rPPG-Toolbox/BVPresults')
+folder_path = Path('../BVPresults')
 
 selected_methods = [
-    "POS"
+    "POS",
+    "CHROM",
 ]
 
 files = []

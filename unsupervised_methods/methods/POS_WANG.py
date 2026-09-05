@@ -40,10 +40,10 @@ def POS_WANG(frames, fs):
             H[0, m:n] = H[0, m:n] + (h[0])
 
     BVP = H
-    BVP = utils.detrend(np.mat(BVP).H, 100)
-    BVP = np.asarray(np.transpose(BVP))[0]
-    b, a = signal.butter(1, [0.75 / fs * 2, 3 / fs * 2], btype='bandpass')
-    BVP = signal.filtfilt(b, a, BVP.astype(np.double))
+    # BVP = utils.detrend(np.mat(BVP).H, 100)
+    BVP = np.asarray(np.transpose(np.mat(BVP).H))[0]
+    # b, a = signal.butter(3, [0.2 / fs * 2, 3.3 / fs * 2], btype='bandpass')
+    # BVP = signal.filtfilt(b, a, BVP.astype(np.double))
     return BVP
 
 

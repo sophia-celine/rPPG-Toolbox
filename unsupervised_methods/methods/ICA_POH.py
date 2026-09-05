@@ -12,39 +12,67 @@ from unsupervised_methods import utils
 
 
 def ICA_POH(frames, FS):
-    # Cut off frequency.
-    LPF = 0.7
-    HPF = 2.5
     RGB = process_video(frames)
 
-    NyquistF = 1 / 2 * FS
+    # Normalização direta dos canais RGB, sem detrend
     BGRNorm = np.zeros(RGB.shape)
-    Lambda = 100
+
     for c in range(3):
-        BGRDetrend = utils.detrend(RGB[:, c], Lambda)
-        BGRNorm[:, c] = (BGRDetrend - np.mean(BGRDetrend)) / np.std(BGRDetrend)
+        BGRNorm[:, c] = (
+            (RGB[:, c] - np.mean(RGB[:, c])) /
+            np.std(RGB[:, c])
+        )
+
+    # ICA
     _, S = ica(np.mat(BGRNorm).H, 3)
 
-    # select BVP Source
+    # Seleção da componente com maior potência espectral
     MaxPx = np.zeros((1, 3))
+
     for c in range(3):
         FF = np.fft.fft(S[c, :])
-        F = np.arange(0, FF.shape[1]) / FF.shape[1] * FS * 60
         FF = FF[:, 1:]
         FF = FF[0]
         N = FF.shape[0]
         Px = np.abs(FF[:math.floor(N / 2)])
         Px = np.multiply(Px, Px)
-        Fx = np.arange(0, N / 2) / (N / 2) * NyquistF
         Px = Px / np.sum(Px, axis=0)
         MaxPx[0, c] = np.max(Px)
-    MaxComp = np.argmax(MaxPx)
-    BVP_I = S[MaxComp, :]
-    B, A = signal.butter(3, [LPF / NyquistF, HPF / NyquistF], 'bandpass')
-    BVP_F = signal.filtfilt(B, A, np.real(BVP_I).astype(np.double))
 
-    BVP = BVP_F[0]
+    MaxComp = np.argmax(MaxPx)
+
+    BVP = np.asarray(np.real(S[MaxComp, :]).astype(np.double)[0]).flatten()
+
     return BVP
+
+# def ICA_POH(frames, FS):
+#     RGB = process_video(frames)
+
+#     BGRNorm = np.zeros(RGB.shape)
+
+#     for c in range(3):
+#         BGRNorm[:, c] = (
+#             (RGB[:, c] - np.mean(RGB[:, c])) /
+#             np.std(RGB[:, c])
+#         )
+
+#     _, S = ica(BGRNorm.T, 3)
+
+#     # S = np.asarray(S)
+
+#     MaxPx = np.zeros(3)
+#     for c in range(3):
+#         FF = np.fft.fft(S[c, :])
+#         FF = FF[1:]
+#         N = FF.shape[0]
+#         Px = np.abs(FF[:N // 2]) ** 2
+#         Px = Px / np.sum(Px)
+#         MaxPx[c] = np.max(Px)
+#     MaxComp = np.argmax(MaxPx)
+
+#     BVP = np.asarray(np.real(S[MaxComp, :]), dtype=np.float64).flatten()
+
+#     return BVP
 
 
 def process_video(frames):

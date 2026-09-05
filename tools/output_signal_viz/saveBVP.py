@@ -21,11 +21,11 @@ from scipy import signal
 from scipy import sparse
 
 
-data_out_path = "/home/sophia/rPPG-Toolbox/runs/exp/ICU_SizeW128_SizeH128_ClipLength160_DataTypeDiffNormalized_DataAugNone_LabelTypeDiffNormalized_Crop_faceTrue_BackendY5F_Large_boxFalse_Large_size1.5_Dyamic_DetTrue_det_len25_Median_face_boxFalse/saved_test_outputs/PURE_PhysFormer_DiffNormalized_ICU_outputs.pickle"
+data_out_path = "/home/soph/rppg/rPPG-Toolbox/runs/exp/test_SizeW128_SizeH128_ClipLength160_DataTypeDiffNormalized_DataAugNone_LabelTypeDiffNormalized_Crop_faceTrue_BackendY5F_Large_boxFalse_Large_size1.5_Dyamic_DetTrue_det_len25_Median_face_boxFalse/saved_test_outputs/PURE_PhysFormer_DiffNormalized_test_outputs.pickle"
 chunk_size = 360 # size of chunk to visualize: -1 will plot the entire signal
 chunk_num = 0
 model = "PhysFormerPURE"
-path = "/home/sophia/rPPG-Toolbox/BVPresults"
+path = "/home/soph/rppg/rPPG-Toolbox/BVPresults"
 
 # HELPER FUNCTIONS
 
@@ -43,30 +43,26 @@ def _reform_data_from_dict(data, flatten=True):
     return sort_data
 
 def _process_signal(signal, fs=30, diff_flag=True, use_bandpass=False):
-    # Detrend and filter
-    if diff_flag:  # if the predictions and labels are 1st derivative of PPG signal.
-        gt_bvp = _detrend(np.cumsum(signal), 100)
-    else:
-        gt_bvp = _detrend(signal, 100)
+    # Filter
     if use_bandpass:
-        [b, a] = butter(1, [0.6 / fs * 2, 3.3 / fs * 2], btype='bandpass')
+        [b, a] = butter(3, [0.2 / fs * 2, 3.3 / fs * 2], btype='bandpass')
         signal = scipy.signal.filtfilt(b, a, np.double(signal))
     return signal
 
-def _detrend(input_signal, lambda_value):
-    """Detrend PPG signal."""
-    signal_length = input_signal.shape[0]
-    # observation matrix
-    H = np.identity(signal_length)
-    ones = np.ones(signal_length)
-    minus_twos = -2 * np.ones(signal_length)
-    diags_data = np.array([ones, minus_twos, ones])
-    diags_index = np.array([0, 1, 2])
-    D = spdiags(diags_data, diags_index,
-                (signal_length - 2), signal_length).toarray()
-    detrended_signal = np.dot(
-        (H - np.linalg.inv(H + (lambda_value ** 2) * np.dot(D.T, D))), input_signal)
-    return detrended_signal
+# def _detrend(input_signal, lambda_value):
+#     """Detrend PPG signal."""
+#     signal_length = input_signal.shape[0]
+#     # observation matrix
+#     H = np.identity(signal_length)
+#     ones = np.ones(signal_length)
+#     minus_twos = -2 * np.ones(signal_length)
+#     diags_data = np.array([ones, minus_twos, ones])
+#     diags_index = np.array([0, 1, 2])
+#     D = spdiags(diags_data, diags_index,
+#                 (signal_length - 2), signal_length).toarray()
+#     detrended_signal = np.dot(
+#         (H - np.linalg.inv(H + (lambda_value ** 2) * np.dot(D.T, D))), input_signal)
+#     return detrended_signal
 
 # Read in data and list subjects
 with open(data_out_path, 'rb') as f:

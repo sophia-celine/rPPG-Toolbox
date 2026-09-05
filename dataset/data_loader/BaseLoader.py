@@ -186,10 +186,11 @@ class BaseLoader(Dataset):
 
         # filter POS PPG w/ 2nd order butterworth filter (around HR freq)
         # min freq of 0.7Hz was experimentally found to work better than 0.75Hz
-        min_freq = 0.70
-        max_freq = 3
-        b, a = signal.butter(2, [(min_freq) / fs * 2, (max_freq) / fs * 2], btype='bandpass')
-        pos_bvp = signal.filtfilt(b, a, bvp.astype(np.double))
+        # min_freq = 0.70
+        # max_freq = 3
+        # b, a = signal.butter(2, [(min_freq) / fs * 2, (max_freq) / fs * 2], btype='bandpass')
+        # pos_bvp = signal.filtfilt(b, a, bvp.astype(np.double))
+        pos_bvp = bvp
 
         # apply hilbert normalization to normalize PPG amplitude
         analytic_signal = signal.hilbert(pos_bvp) 
