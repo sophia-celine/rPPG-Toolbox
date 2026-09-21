@@ -72,8 +72,8 @@ class testLoader(BaseLoader):
                 # Utilize dataset-specific function to read video
                 frames = self.read_video(
                     os.path.join(data_dirs[i]['path'],"vid.avi"),
-                    width=520,
-                    height=520)
+                    width=256,
+                    height=256)
             elif 'Motion' in config_preprocess.DATA_AUG:
                 # Utilize general function to read video in .npy format
                 frames = self.read_npy_video(

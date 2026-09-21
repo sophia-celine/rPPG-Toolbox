@@ -172,7 +172,7 @@ class BaseLoader(Dataset):
             m = n - l
             if m >= 0:
                 Cn = np.true_divide(RGB[m:n, :], np.mean(RGB[m:n, :], axis=0))
-                Cn = np.mat(Cn).H
+                Cn = np.asmatrix(Cn).H
                 S = np.matmul(np.array([[0, 1, -1], [-2, 1, 1]]), Cn)
                 h = S[0, :] + (np.std(S[0, :]) / np.std(S[1, :])) * S[1, :]
                 mean_h = np.mean(h)
@@ -181,7 +181,7 @@ class BaseLoader(Dataset):
                 H[0, m:n] = H[0, m:n] + (h[0])
 
         bvp = H
-        bvp = utils.detrend(np.mat(bvp).H, 100)
+        bvp = utils.detrend(np.asmatrix(bvp).H, 100)
         bvp = np.asarray(np.transpose(bvp))[0]
 
         # filter POS PPG w/ 2nd order butterworth filter (around HR freq)
@@ -283,20 +283,35 @@ class BaseLoader(Dataset):
         if not hasattr(self, 'MPObj') or self.MPObj is None:
             try:
                 import mediapipe as mp
+                from mediapipe.tasks import python
+                from mediapipe.tasks.python import vision
             except ImportError as error:
                 raise ImportError(
-                    "MediaPipe backend requires the 'mediapipe' package. "
-                    "Install it with 'pip install mediapipe'."
+                    "MediaPipe Face Landmarker requires the 'mediapipe' package "
+                    "with the Tasks API. Install it with 'pip install mediapipe'."
                 ) from error
-            self.MPModule = mp
+
             mp_config = self.config_data.PREPROCESS.CROP_FACE.MEDIAPIPE
-            self.MPObj = mp.solutions.face_mesh.FaceMesh(
-                static_image_mode=True,
-                max_num_faces=mp_config.MAX_NUM_FACES,
-                refine_landmarks=mp_config.REFINE_LANDMARKS,
-                min_detection_confidence=mp_config.MIN_DETECTION_CONFIDENCE,
+            model_path = os.path.expanduser(mp_config.MODEL_PATH)
+            if not os.path.isfile(model_path):
+                raise FileNotFoundError(
+                    "MediaPipe Face Landmarker model was not found at "
+                    f"'{model_path}'. Download a compatible face_landmarker.task "
+                    "file and set CROP_FACE.MEDIAPIPE.MODEL_PATH to its path."
+                )
+
+            self.MPModule = mp
+            self.MPVision = vision
+            base_options = python.BaseOptions(model_asset_path=model_path)
+            options = vision.FaceLandmarkerOptions(
+                base_options=base_options,
+                running_mode=vision.RunningMode.IMAGE,
+                num_faces=mp_config.MAX_NUM_FACES,
+                min_face_detection_confidence=mp_config.MIN_DETECTION_CONFIDENCE,
+                min_face_presence_confidence=mp_config.MIN_FACE_PRESENCE_CONFIDENCE,
                 min_tracking_confidence=mp_config.MIN_TRACKING_CONFIDENCE,
             )
+            self.MPObj = vision.FaceLandmarker.create_from_options(options)
         return self.MPObj
 
     def _mediapipe_face_detection(self, frame):
@@ -305,33 +320,45 @@ class BaseLoader(Dataset):
         region_config = self.config_data.PREPROCESS.CROP_FACE.REGION
         frame_height, frame_width = frame.shape[:2]
         frame_rgb = cv2.cvtColor(frame[:, :, :3].astype(np.uint8), cv2.COLOR_BGR2RGB)
-        result = detector.process(frame_rgb)
-        if not result.multi_face_landmarks:
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
+        result = detector.detect(mp_image)
+        if not result.face_landmarks:
             return [0, 0, frame_width, frame_height], None
 
         mask = np.zeros((frame_height, frame_width), dtype=np.uint8)
-        for face_landmarks in result.multi_face_landmarks:
+        face_oval_indices = np.asarray([
+            10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
+            397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
+            172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109,
+        ], dtype=np.int32)
+        left_eye_indices = np.asarray([
+            263, 249, 390, 373, 374, 380, 381, 382, 359, 466, 388, 387,
+            386, 385, 384, 398,
+        ], dtype=np.int32)
+        right_eye_indices = np.asarray([
+            33, 7, 163, 144, 145, 153, 154, 155, 133, 246, 161, 160,
+            159, 158, 157, 173,
+        ], dtype=np.int32)
+        lip_indices = np.asarray([
+            61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308,
+            324, 318, 402, 317, 14, 87, 178, 88, 95, 78,
+        ], dtype=np.int32)
+
+        for face_landmarks in result.face_landmarks:
             points = np.asarray([
                 [
                     int(np.clip(landmark.x * frame_width, 0, frame_width - 1)),
                     int(np.clip(landmark.y * frame_height, 0, frame_height - 1)),
                 ]
-                for landmark in face_landmarks.landmark
+                for landmark in face_landmarks
             ], dtype=np.int32)
-            face_points = points[
-                np.unique(np.asarray(list(mp.solutions.face_mesh.FACEMESH_FACE_OVAL), dtype=np.int32))
-            ]
+            face_points = points[face_oval_indices]
             cv2.fillConvexPoly(mask, cv2.convexHull(face_points), 1)
             if region_config.EXCLUDE_EYES:
-                for connections in (
-                    mp.solutions.face_mesh.FACEMESH_LEFT_EYE,
-                    mp.solutions.face_mesh.FACEMESH_RIGHT_EYE,
-                ):
-                    indices = np.unique(np.asarray(list(connections), dtype=np.int32))
+                for indices in (left_eye_indices, right_eye_indices):
                     cv2.fillConvexPoly(mask, cv2.convexHull(points[indices]), 0)
             if region_config.EXCLUDE_MOUTH:
-                indices = np.unique(np.asarray(list(mp.solutions.face_mesh.FACEMESH_LIPS), dtype=np.int32))
-                cv2.fillConvexPoly(mask, cv2.convexHull(points[indices]), 0)
+                cv2.fillConvexPoly(mask, cv2.convexHull(points[lip_indices]), 0)
 
         ys, xs = np.where(mask > 0)
         if len(xs) == 0:

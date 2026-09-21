@@ -411,10 +411,12 @@ Here are some explanation of parameters:
   * `DO_CHUNK`: Whether to split the raw data into smaller chunks
   * `CHUNK_LENGTH`: The length of each chunk (number of frames)
   * `DO_CROP_FACE`: Whether to perform face detection
-  * `BACKEND`: Select which backend to use for face detection. Options are HC (Haar Cascade), Y5F (YOLO5Face), or MediaPipe (also accepted as MP). MediaPipe can produce a polygon mask for the face, excluding the eyes and mouth when configured.
+  * `BACKEND`: Select which backend to use for face detection. Options are HC (Haar Cascade), Y5F (YOLO5Face), or MediaPipe (also accepted as MP). MediaPipe uses the Tasks Face Landmarker and can produce a polygon mask for the face, excluding the eyes and mouth when configured.
   * `REGION.MODE`: Select `RECTANGLE` for the traditional bounding-box input or `POLYGON` for a polygonal ROI. In polygon mode, preprocessing returns RGB plus a binary mask channel; unsupervised methods use that mask for spatial averages.
   * `REGION.SOURCE`: Polygon provider. `MEDIAPIPE_FACE` is currently implemented; this setting is reserved for future skin-segmentation providers.
   * `REGION.EXCLUDE_EYES` / `REGION.EXCLUDE_MOUTH`: Control holes in the MediaPipe facial polygon.
+  * `MEDIAPIPE.MODEL_PATH`: Path to the MediaPipe Face Landmarker `.task` model asset. The asset must be downloaded separately and is not bundled with the repository.
+  * `MEDIAPIPE.MIN_FACE_PRESENCE_CONFIDENCE`: Minimum confidence for the detected face presence.
   * `MEDIAPIPE`: MediaPipe-specific options are `MAX_NUM_FACES`, `REFINE_LANDMARKS`, `MIN_DETECTION_CONFIDENCE`, and `MIN_TRACKING_CONFIDENCE`.
   * `DYNAMIC_DETECTION`: If `False`, face detection is only performed at the first frame and the detected box is used to crop the video for all of the subsequent frames. If `True`, face detection is performed at a specific frequency which is defined by `DYNAMIC_DETECTION_FREQUENCY`. 
   * `DYNAMIC_DETECTION_FREQUENCY`: The frequency of face detection (number of frames) if DYNAMIC_DETECTION is `True`

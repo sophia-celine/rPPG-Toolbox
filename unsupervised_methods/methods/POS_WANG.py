@@ -27,7 +27,7 @@ def POS_WANG(frames, fs):
         m = n - l
         if m >= 0:
             Cn = np.true_divide(RGB[m:n, :], np.mean(RGB[m:n, :], axis=0))
-            Cn = np.mat(Cn).H
+            Cn = np.asmatrix(Cn).H
             S = np.matmul(np.array([[0, 1, -1], [-2, 1, 1]]), Cn)
             h = S[0, :] + (np.std(S[0, :]) / np.std(S[1, :])) * S[1, :]
             mean_h = np.mean(h)
@@ -37,7 +37,7 @@ def POS_WANG(frames, fs):
 
     BVP = H
     # BVP = utils.detrend(np.mat(BVP).H, 100)
-    BVP = np.asarray(np.transpose(np.mat(BVP).H))[0]
+    BVP = np.asarray(np.transpose(np.asmatrix(BVP).H))[0]
     # b, a = signal.butter(3, [0.2 / fs * 2, 3.3 / fs * 2], btype='bandpass')
     # BVP = signal.filtfilt(b, a, BVP.astype(np.double))
     return BVP
