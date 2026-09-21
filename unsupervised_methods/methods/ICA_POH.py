@@ -76,12 +76,8 @@ def ICA_POH(frames, FS):
 
 
 def process_video(frames):
-    "Calculates the average value of each frame."
-    RGB = []
-    for frame in frames:
-        sum = np.sum(np.sum(frame, axis=0), axis=0)
-        RGB.append(sum / (frame.shape[0] * frame.shape[1]))
-    return np.asarray(RGB)
+    """Return per-frame RGB means as (T, 3), respecting an optional mask channel."""
+    return np.transpose(utils.process_video(frames)[0], (1, 0))
 
 
 def ica(X, Nsources, Wprev=0):

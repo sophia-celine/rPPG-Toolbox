@@ -240,11 +240,16 @@ class BaseLoader(Dataset):
             config_preprocess.CROP_FACE.DETECTION.DYNAMIC_DETECTION_FREQUENCY,
             config_preprocess.CROP_FACE.DETECTION.USE_MEDIAN_FACE_BOX,
             config_preprocess.RESIZE.W,
-            config_preprocess.RESIZE.H)
+            config_preprocess.RESIZE.H,
+            config_preprocess.CROP_FACE.REGION.MODE)
+        polygon_mode = config_preprocess.CROP_FACE.REGION.MODE.upper() == 'POLYGON'
+        region_mask = frames[..., 3:] if polygon_mode else None
+        signal_frames = frames[..., :3] if polygon_mode else frames
+
         # Check data transformation type
         data = list()  # Video data
         for data_type in config_preprocess.DATA_TYPE:
-            f_c = frames.copy()
+            f_c = signal_frames.copy()
             if data_type == "Raw":
                 data.append(f_c)
             elif data_type == "DiffNormalized":
@@ -254,6 +259,8 @@ class BaseLoader(Dataset):
             else:
                 raise ValueError("Unsupported data type!")
         data = np.concatenate(data, axis=-1)  # concatenate all channels
+        if region_mask is not None:
+            data = np.concatenate((data, region_mask.astype(np.float32)), axis=-1)
         if config_preprocess.LABEL_TYPE == "Raw":
             pass
         elif config_preprocess.LABEL_TYPE == "DiffNormalized":
@@ -272,7 +279,67 @@ class BaseLoader(Dataset):
 
         return frames_clips, bvps_clips
 
-    def face_detection(self, frame, backend, use_larger_box=False, larger_box_coef=1.0):
+    def _get_mediapipe_detector(self):
+        if not hasattr(self, 'MPObj') or self.MPObj is None:
+            try:
+                import mediapipe as mp
+            except ImportError as error:
+                raise ImportError(
+                    "MediaPipe backend requires the 'mediapipe' package. "
+                    "Install it with 'pip install mediapipe'."
+                ) from error
+            self.MPModule = mp
+            mp_config = self.config_data.PREPROCESS.CROP_FACE.MEDIAPIPE
+            self.MPObj = mp.solutions.face_mesh.FaceMesh(
+                static_image_mode=True,
+                max_num_faces=mp_config.MAX_NUM_FACES,
+                refine_landmarks=mp_config.REFINE_LANDMARKS,
+                min_detection_confidence=mp_config.MIN_DETECTION_CONFIDENCE,
+                min_tracking_confidence=mp_config.MIN_TRACKING_CONFIDENCE,
+            )
+        return self.MPObj
+
+    def _mediapipe_face_detection(self, frame):
+        detector = self._get_mediapipe_detector()
+        mp = self.MPModule
+        region_config = self.config_data.PREPROCESS.CROP_FACE.REGION
+        frame_height, frame_width = frame.shape[:2]
+        frame_rgb = cv2.cvtColor(frame[:, :, :3].astype(np.uint8), cv2.COLOR_BGR2RGB)
+        result = detector.process(frame_rgb)
+        if not result.multi_face_landmarks:
+            return [0, 0, frame_width, frame_height], None
+
+        mask = np.zeros((frame_height, frame_width), dtype=np.uint8)
+        for face_landmarks in result.multi_face_landmarks:
+            points = np.asarray([
+                [
+                    int(np.clip(landmark.x * frame_width, 0, frame_width - 1)),
+                    int(np.clip(landmark.y * frame_height, 0, frame_height - 1)),
+                ]
+                for landmark in face_landmarks.landmark
+            ], dtype=np.int32)
+            face_points = points[
+                np.unique(np.asarray(list(mp.solutions.face_mesh.FACEMESH_FACE_OVAL), dtype=np.int32))
+            ]
+            cv2.fillConvexPoly(mask, cv2.convexHull(face_points), 1)
+            if region_config.EXCLUDE_EYES:
+                for connections in (
+                    mp.solutions.face_mesh.FACEMESH_LEFT_EYE,
+                    mp.solutions.face_mesh.FACEMESH_RIGHT_EYE,
+                ):
+                    indices = np.unique(np.asarray(list(connections), dtype=np.int32))
+                    cv2.fillConvexPoly(mask, cv2.convexHull(points[indices]), 0)
+            if region_config.EXCLUDE_MOUTH:
+                indices = np.unique(np.asarray(list(mp.solutions.face_mesh.FACEMESH_LIPS), dtype=np.int32))
+                cv2.fillConvexPoly(mask, cv2.convexHull(points[indices]), 0)
+
+        ys, xs = np.where(mask > 0)
+        if len(xs) == 0:
+            return [0, 0, frame_width, frame_height], None
+        return [int(xs.min()), int(ys.min()), int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)], mask
+
+    def face_detection(self, frame, backend, use_larger_box=False, larger_box_coef=1.0,
+                       return_polygon=False):
         """Face detection on a single frame.
 
         Args:
@@ -281,8 +348,9 @@ class BaseLoader(Dataset):
             use_larger_box(bool): whether to use a larger bounding box on face detection.
             larger_box_coef(float): Coef. of larger box.
         Returns:
-            face_box_coor(List[int]): coordinates of face bouding box.
+            face_box_coor(List[int]): coordinates of face bounding box.
         """
+        face_mask = None
         if backend == "HC":
             # Use OpenCV's Haar Cascade algorithm implementation for face detection
             # This should only utilize the CPU
@@ -296,7 +364,7 @@ class BaseLoader(Dataset):
 
             if len(face_zone) < 1:
                 print("ERROR: No Face Detected")
-                face_box_coor = [0, 0, frame.shape[0], frame.shape[1]]
+                face_box_coor = [0, 0, frame.shape[1], frame.shape[0]]
             elif len(face_zone) >= 2:
                 # Find the index of the largest face zone
                 # The face zones are boxes, so the width and height are the same
@@ -343,7 +411,9 @@ class BaseLoader(Dataset):
 
             else:
                 print("ERROR: No Face Detected")
-                face_box_coor = [0, 0, frame.shape[0], frame.shape[1]]
+                face_box_coor = [0, 0, frame.shape[1], frame.shape[0]]
+        elif backend.upper() in ("MP", "MEDIAPIPE"):
+            face_box_coor, face_mask = self._mediapipe_face_detection(frame)
         else:
             raise ValueError("Unsupported face detection backend!")
 
@@ -352,10 +422,13 @@ class BaseLoader(Dataset):
             face_box_coor[1] = max(0, face_box_coor[1] - (larger_box_coef - 1.0) / 2 * face_box_coor[3])
             face_box_coor[2] = larger_box_coef * face_box_coor[2]
             face_box_coor[3] = larger_box_coef * face_box_coor[3]
+        face_box_coor = [int(round(value)) for value in face_box_coor]
+        if return_polygon:
+            return face_box_coor, face_mask
         return face_box_coor
 
-    def crop_face_resize(self, frames, use_face_detection, backend, use_larger_box, larger_box_coef, use_dynamic_detection, 
-                         detection_freq, use_median_box, width, height):
+    def crop_face_resize(self, frames, use_face_detection, backend, use_larger_box, larger_box_coef, use_dynamic_detection,
+                         detection_freq, use_median_box, width, height, region_mode='RECTANGLE'):
         """Crop face and resize frames.
 
         Args:
@@ -373,18 +446,39 @@ class BaseLoader(Dataset):
         Returns:
             resized_frames(list[np.array(float)]): Resized and cropped frames
         """
+        region_mode = region_mode.upper()
+        if region_mode not in ('RECTANGLE', 'POLYGON'):
+            raise ValueError("Unsupported region mode. Use 'RECTANGLE' or 'POLYGON'.")
+        polygon_mode = region_mode == 'POLYGON'
+        if polygon_mode and backend.upper() not in ('MP', 'MEDIAPIPE'):
+            raise ValueError("POLYGON mode currently requires the MediaPipe backend.")
+        if polygon_mode and self.config_data.PREPROCESS.CROP_FACE.REGION.SOURCE.upper() != 'MEDIAPIPE_FACE':
+            raise ValueError(
+                "Unsupported polygon source. Currently only 'MEDIAPIPE_FACE' is implemented."
+            )
+
         # Face Cropping
         if use_dynamic_detection:
             num_dynamic_det = ceil(frames.shape[0] / detection_freq)
         else:
             num_dynamic_det = 1
         face_region_all = []
+        face_mask_all = []
         # Perform face detection by num_dynamic_det" times.
         for idx in range(num_dynamic_det):
             if use_face_detection:
-                face_region_all.append(self.face_detection(frames[detection_freq * idx], backend, use_larger_box, larger_box_coef))
+                detection = self.face_detection(
+                    frames[detection_freq * idx], backend, use_larger_box, larger_box_coef,
+                    return_polygon=polygon_mode)
+                if polygon_mode:
+                    face_region, face_mask = detection
+                    face_region_all.append(face_region)
+                    face_mask_all.append(face_mask)
+                else:
+                    face_region_all.append(detection)
             else:
                 face_region_all.append([0, 0, frames.shape[1], frames.shape[2]])
+                face_mask_all.append(np.ones(frames.shape[1:3], dtype=np.uint8) if polygon_mode else None)
         face_region_all = np.asarray(face_region_all, dtype='int')
         if use_median_box:
             # Generate a median bounding box based on all detected face regions
@@ -392,7 +486,8 @@ class BaseLoader(Dataset):
 
         # Frame Resizing
         total_frames, _, _, channels = frames.shape
-        resized_frames = np.zeros((total_frames, height, width, channels))
+        output_channels = channels + 1 if polygon_mode else channels
+        resized_frames = np.zeros((total_frames, height, width, output_channels), dtype=np.float32)
         for i in range(0, total_frames):
             frame = frames[i]
             if use_dynamic_detection:  # use the (i // detection_freq)-th facial region.
@@ -400,13 +495,28 @@ class BaseLoader(Dataset):
             else:  # use the first region obtrained from the first frame.
                 reference_index = 0
             if use_face_detection:
-                if use_median_box:
+                if use_median_box and not polygon_mode:
                     face_region = face_region_median
                 else:
                     face_region = face_region_all[reference_index]
-                frame = frame[max(face_region[1], 0):min(face_region[1] + face_region[3], frame.shape[0]),
-                        max(face_region[0], 0):min(face_region[0] + face_region[2], frame.shape[1])]
-            resized_frames[i] = cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
+                x_start = max(face_region[0], 0)
+                y_start = max(face_region[1], 0)
+                x_end = min(face_region[0] + face_region[2], frame.shape[1])
+                y_end = min(face_region[1] + face_region[3], frame.shape[0])
+                frame = frame[y_start:y_end, x_start:x_end]
+                if polygon_mode:
+                    mask = face_mask_all[reference_index]
+                    if mask is None:
+                        mask = np.ones(frame.shape[:2], dtype=np.uint8)
+                    else:
+                        mask = mask[y_start:y_end, x_start:x_end]
+            resized_frame = cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
+            if polygon_mode:
+                resized_mask = cv2.resize(mask, (width, height), interpolation=cv2.INTER_NEAREST)
+                resized_frames[i, ..., :channels] = resized_frame
+                resized_frames[i, ..., channels] = (resized_mask > 0).astype(np.float32)
+            else:
+                resized_frames[i] = resized_frame
         return resized_frames
 
     def chunk(self, frames, bvps, chunk_length):

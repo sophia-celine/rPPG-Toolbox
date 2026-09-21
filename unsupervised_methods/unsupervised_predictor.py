@@ -19,6 +19,31 @@ N_ROWS_SPECTROGRAM_PLOT = (len(ALL_UNSUPERVISED_METHODS) + 3) // 4 # Ceiling div
 N_COLS_SPECTROGRAM_PLOT = 4 # Fixed columns for better layout
 
 
+def _prepare_unsupervised_frames(data_input, data_format, polygon_mode=False):
+    """Convert loader output to (T, H, W, RGB[, mask]) for unsupervised methods."""
+    if data_format == "NDHWC":
+        frames = data_input
+    elif data_format == "NDCHW":
+        if data_input.ndim != 4:
+            raise ValueError(f"NDCHW input must have shape (T,C,H,W), got {data_input.shape}.")
+        frames = np.transpose(data_input, (0, 2, 3, 1))
+    elif data_format == "NCDHW":
+        if data_input.ndim != 4:
+            raise ValueError(f"NCDHW input must have shape (C,T,H,W), got {data_input.shape}.")
+        frames = np.transpose(data_input, (1, 2, 3, 0))
+    else:
+        raise ValueError(f"Unsupported DATA_FORMAT '{data_format}'.")
+
+    if frames.ndim != 4 or frames.shape[-1] < 3:
+        raise ValueError(
+            "Unsupervised methods require (T,H,W,3) or (T,H,W,4) input; "
+            f"received {frames.shape}."
+        )
+    if polygon_mode and frames.shape[-1] > 3:
+        return np.concatenate((frames[..., :3], frames[..., -1:]), axis=-1).astype(np.float32)
+    return np.asarray(frames[..., :3], dtype=np.float32)
+
+
 def unsupervised_predict(config, data_loader, method_name):
     """ Model evaluation on the testing dataset."""
     if data_loader["unsupervised"] is None:
@@ -35,8 +60,12 @@ def unsupervised_predict(config, data_loader, method_name):
         batch_size = test_batch[0].shape[0]
         print('-------------- batch size -----------------', batch_size)
         for idx in range(batch_size):
-            data_input, labels_input = test_batch[0][idx].cpu().numpy(), test_batch[1][idx].cpu().numpy()
-            data_input = data_input[..., :3]
+            data_input = _prepare_unsupervised_frames(
+                test_batch[0][idx].cpu().numpy(),
+                config.UNSUPERVISED.DATA.DATA_FORMAT,
+                config.UNSUPERVISED.DATA.PREPROCESS.CROP_FACE.REGION.MODE.upper() == "POLYGON",
+            )
+            labels_input = test_batch[1][idx].cpu().numpy()
             
             bvp_signals_for_all_methods = {}
             bvp_for_current_method_arg = None # This will store the BVP for the method_name passed to the function
@@ -86,7 +115,7 @@ def unsupervised_predict(config, data_loader, method_name):
             out_path = f'BVPresults/BVP_{method_name}_{subject_name}.txt'
             np.savetxt(out_path, bvp_for_current_method_arg, fmt='%.7e') # Isso salvará os dados para o método específico
 
-            video_frame_size = test_batch[0].shape[1]
+            video_frame_size = data_input.shape[0]
             print(f"Video frame size: {video_frame_size}, Window frame size: {config.INFERENCE.EVALUATION_WINDOW.WINDOW_SIZE * config.UNSUPERVISED.DATA.FS}")
             if config.INFERENCE.EVALUATION_WINDOW.USE_SMALLER_WINDOW:
                 window_frame_size = config.INFERENCE.EVALUATION_WINDOW.WINDOW_SIZE * config.UNSUPERVISED.DATA.FS

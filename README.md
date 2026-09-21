@@ -411,7 +411,11 @@ Here are some explanation of parameters:
   * `DO_CHUNK`: Whether to split the raw data into smaller chunks
   * `CHUNK_LENGTH`: The length of each chunk (number of frames)
   * `DO_CROP_FACE`: Whether to perform face detection
-  * `BACKEND`: Select which backend to use for face detection. Currently, the options are HC (Haar Cascade) or Y5F (YOLO5Face). We recommend using Haar Cascade (the config default) in order to reproduce results from the [NeurIPS 2023 Datasets and Benchmarks paper](https://arxiv.org/abs/2210.00716) that corresponds to this toolbox. If you want to use YOLO5Face in your own custom config, we recommend that you reference configs that use it as a default (e.g., FactorizePhys).
+  * `BACKEND`: Select which backend to use for face detection. Options are HC (Haar Cascade), Y5F (YOLO5Face), or MediaPipe (also accepted as MP). MediaPipe can produce a polygon mask for the face, excluding the eyes and mouth when configured.
+  * `REGION.MODE`: Select `RECTANGLE` for the traditional bounding-box input or `POLYGON` for a polygonal ROI. In polygon mode, preprocessing returns RGB plus a binary mask channel; unsupervised methods use that mask for spatial averages.
+  * `REGION.SOURCE`: Polygon provider. `MEDIAPIPE_FACE` is currently implemented; this setting is reserved for future skin-segmentation providers.
+  * `REGION.EXCLUDE_EYES` / `REGION.EXCLUDE_MOUTH`: Control holes in the MediaPipe facial polygon.
+  * `MEDIAPIPE`: MediaPipe-specific options are `MAX_NUM_FACES`, `REFINE_LANDMARKS`, `MIN_DETECTION_CONFIDENCE`, and `MIN_TRACKING_CONFIDENCE`.
   * `DYNAMIC_DETECTION`: If `False`, face detection is only performed at the first frame and the detected box is used to crop the video for all of the subsequent frames. If `True`, face detection is performed at a specific frequency which is defined by `DYNAMIC_DETECTION_FREQUENCY`. 
   * `DYNAMIC_DETECTION_FREQUENCY`: The frequency of face detection (number of frames) if DYNAMIC_DETECTION is `True`
   * `USE_MEDIAN_FACE_BOX`: If `True` and `DYNAMIC_DETECTION` is `True`, use the detected face boxs throughout each video to create a single, median face box per video.

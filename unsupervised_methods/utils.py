@@ -26,10 +26,18 @@ def detrend(input_signal, lambda_value):
 
 
 def process_video(frames):
+    """Return per-frame RGB means as (1, 3, T), optionally using a mask channel."""
     RGB = []
     for frame in frames:
-        summation = np.sum(np.sum(frame, axis=0), axis=0)
-        RGB.append(summation / (frame.shape[0] * frame.shape[1]))
+        channels = frame[..., :3]
+        if frame.shape[-1] > 3:
+            mask = frame[..., 3] > 0
+            if not np.any(mask):
+                RGB.append(np.zeros(3, dtype=np.float32))
+                continue
+            RGB.append(np.mean(channels[mask], axis=0))
+        else:
+            RGB.append(np.mean(channels, axis=(0, 1)))
     RGB = np.asarray(RGB)
     RGB = RGB.transpose(1, 0).reshape(1, 3, -1)
     return np.asarray(RGB)
