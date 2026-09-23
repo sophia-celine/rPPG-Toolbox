@@ -58,7 +58,6 @@ def unsupervised_predict(config, data_loader, method_name):
     sbar = tqdm(data_loader["unsupervised"], ncols=80)
     for it, test_batch in enumerate(sbar):
         batch_size = test_batch[0].shape[0]
-        print('-------------- batch size -----------------', batch_size)
         for idx in range(batch_size):
             data_input = _prepare_unsupervised_frames(
                 test_batch[0][idx].cpu().numpy(),
@@ -114,42 +113,48 @@ def unsupervised_predict(config, data_loader, method_name):
 
             out_path = f'BVPresults/BVP_{method_name}_{subject_name}.txt'
             np.savetxt(out_path, bvp_for_current_method_arg, fmt='%.7e') # Isso salvará os dados para o método específico
+            print(f"Saved BVP for method '{method_name}' to {out_path}")
 
-            video_frame_size = data_input.shape[0]
-            print(f"Video frame size: {video_frame_size}, Window frame size: {config.INFERENCE.EVALUATION_WINDOW.WINDOW_SIZE * config.UNSUPERVISED.DATA.FS}")
-            if config.INFERENCE.EVALUATION_WINDOW.USE_SMALLER_WINDOW:
-                window_frame_size = config.INFERENCE.EVALUATION_WINDOW.WINDOW_SIZE * config.UNSUPERVISED.DATA.FS
-                print(f"Using smaller window size: {window_frame_size}")
-                if window_frame_size > video_frame_size:
-                    window_frame_size = video_frame_size
-            else:
-                window_frame_size = video_frame_size
-
-            for i in range(0, len(BVP), window_frame_size):
-                BVP_window = bvp_for_current_method_arg[i:i+window_frame_size]
-                label_window = labels_input[i:i+window_frame_size]
-
-                if len(BVP_window) < 9:
-                    print(f"Window frame size of {len(BVP_window)} is smaller than minimum pad length of 9. Window ignored!")
-                    continue
-
-                if config.INFERENCE.EVALUATION_METHOD == "peak detection":
-                    gt_hr, pre_hr, SNR, macc = calculate_metric_per_video(BVP_window, label_window, diff_flag=False,
-                                                                    fs=config.UNSUPERVISED.DATA.FS, hr_method='Peak')
-                    gt_hr_peak_all.append(gt_hr)
-                    predict_hr_peak_all.append(pre_hr)
-                    SNR_all.append(SNR)
-                    MACC_all.append(macc)
-                elif config.INFERENCE.EVALUATION_METHOD == "FFT":
-                    gt_fft_hr, pre_fft_hr, SNR, macc = calculate_metric_per_video(BVP_window, label_window, diff_flag=False,
-                                                                    fs=config.UNSUPERVISED.DATA.FS, hr_method='FFT')
-                    gt_hr_fft_all.append(gt_fft_hr)
-                    predict_hr_fft_all.append(pre_fft_hr)
-                    SNR_all.append(SNR)
-                    MACC_all.append(macc)
+            if config.INFERENCE.EVAL:
+                video_frame_size = data_input.shape[0]
+                print(f"Video frame size: {video_frame_size}, Window frame size: {config.INFERENCE.EVALUATION_WINDOW.WINDOW_SIZE * config.UNSUPERVISED.DATA.FS}")
+                if config.INFERENCE.EVALUATION_WINDOW.USE_SMALLER_WINDOW:
+                    window_frame_size = config.INFERENCE.EVALUATION_WINDOW.WINDOW_SIZE * config.UNSUPERVISED.DATA.FS
+                    print(f"Using smaller window size: {window_frame_size}")
+                    if window_frame_size > video_frame_size:
+                        window_frame_size = video_frame_size
                 else:
-                    raise ValueError("Inference evaluation method name wrong!")
-    print("Used Unsupervised Method: " + method_name)
+                    window_frame_size = video_frame_size
+
+                for i in range(0, len(BVP), window_frame_size):
+                    BVP_window = bvp_for_current_method_arg[i:i+window_frame_size]
+                    label_window = labels_input[i:i+window_frame_size]
+
+                    if len(BVP_window) < 9:
+                        print(f"Window frame size of {len(BVP_window)} is smaller than minimum pad length of 9. Window ignored!")
+                        continue
+
+                    if config.INFERENCE.EVALUATION_METHOD == "peak detection":
+                        gt_hr, pre_hr, SNR, macc = calculate_metric_per_video(BVP_window, label_window, diff_flag=False,
+                                                                        fs=config.UNSUPERVISED.DATA.FS, hr_method='Peak')
+                        gt_hr_peak_all.append(gt_hr)
+                        predict_hr_peak_all.append(pre_hr)
+                        SNR_all.append(SNR)
+                        MACC_all.append(macc)
+                    elif config.INFERENCE.EVALUATION_METHOD == "FFT":
+                        gt_fft_hr, pre_fft_hr, SNR, macc = calculate_metric_per_video(BVP_window, label_window, diff_flag=False,
+                                                                        fs=config.UNSUPERVISED.DATA.FS, hr_method='FFT')
+                        gt_hr_fft_all.append(gt_fft_hr)
+                        predict_hr_fft_all.append(pre_fft_hr)
+                        SNR_all.append(SNR)
+                        MACC_all.append(macc)
+                    else:
+                        raise ValueError("Inference evaluation method name wrong!")
+        print("Used Unsupervised Method: " + method_name)
+
+    if not config.INFERENCE.EVAL:
+        print("Evaluation is disabled. BVP signals have been saved")
+        return
 
     # Filename ID to be used in any results files (e.g., Bland-Altman plots) that get saved
     if config.TOOLBOX_MODE == 'unsupervised_method':
