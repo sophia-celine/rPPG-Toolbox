@@ -1,5 +1,6 @@
 """Unsupervised learning methods including POS, GREEN, CHROME, ICA, LGI and PBV."""
 import numpy as np
+import os
 from evaluation.post_process import *
 from unsupervised_methods.methods.CHROME_DEHAAN import *
 from unsupervised_methods.methods.GREEN import *
@@ -106,12 +107,29 @@ def unsupervised_predict(config, data_loader, method_name):
             try:
                 subject_name = test_batch[2][idx]
                 chunk_id = test_batch[3][idx]
+                source_video_path = test_batch[4][idx]
             except Exception:
                 # Fallback to previous behaviour if filename/chunk_id are not available
                 subject_name = f'subject{it + 1}'
                 chunk_id = '0'
+                source_video_path = ''
 
-            out_path = f'BVPresults/BVP_{method_name}_{subject_name}.txt'
+            if source_video_path:
+                folder_name = os.path.basename(os.path.dirname(source_video_path))
+                results_folder = os.path.join(
+                    os.path.dirname(source_video_path),
+                    "bvp_results"
+                )
+
+                os.makedirs(results_folder, exist_ok=True)
+
+                out_path = os.path.join(
+                    results_folder,
+                    f"BVP_{method_name}_{folder_name}.txt"
+                )
+                
+            else:
+                out_path = f'BVPresults/BVP_{method_name}_{subject_name}.txt'
             np.savetxt(out_path, bvp_for_current_method_arg, fmt='%.7e') # Isso salvará os dados para o método específico
             print(f"Saved BVP for method '{method_name}' to {out_path}")
 

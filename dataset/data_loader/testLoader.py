@@ -35,6 +35,21 @@ class testLoader(BaseLoader):
                 config_data(CfgNode): data settings(ref:config.py).
         """
         super().__init__(name, data_path, config_data, device)
+        raw_data_dirs = getattr(self, "raw_data_dirs", None)
+        if raw_data_dirs is None and os.path.isdir(data_path):
+            raw_data_dirs = self.get_raw_data(data_path)
+        if raw_data_dirs is None:
+            raw_data_dirs = []
+        self.source_video_paths = {}
+        for data_dir in raw_data_dirs:
+            avi_files = [
+                os.path.join(data_dir["path"], file_name)
+                for file_name in os.listdir(data_dir["path"])
+                if file_name.lower().endswith(".avi")
+                and os.path.isfile(os.path.join(data_dir["path"], file_name))
+            ]
+            if len(avi_files) == 1:
+                self.source_video_paths[data_dir["index"]] = avi_files[0]
 
     def get_raw_data(self, data_path, suffix=None):
         """Returns data directories under the path (For ICU dataset)."""
@@ -69,6 +84,11 @@ class testLoader(BaseLoader):
             data_dirs_new.append(data_dirs[i])
 
         return data_dirs_new
+
+    def __getitem__(self, index):
+        data, label, filename, chunk_id = super().__getitem__(index)
+        source_video_path = self.source_video_paths.get(filename, "")
+        return data, label, filename, chunk_id, source_video_path
 
     def preprocess_dataset_subprocess(self, data_dirs, config_preprocess, i, file_list_dict):
         """ invoked by preprocess_dataset for multi_process."""
@@ -112,7 +132,8 @@ class testLoader(BaseLoader):
                 raise ValueError(f'Unsupported DATA_AUG specified for {self.dataset_name} dataset! Received {config_preprocess.DATA_AUG}.')
 
             # Read Labels
-            if config_preprocess.USE_PSUEDO_PPG_LABEL:
+            if config_preprocess.USE_PSUEDO_PPG_LABEL or not os.path.exists(os.path.join(data_dirs[i]['path'],"ground_truth.txt")):
+                print('Generating pseudo labels for', data_dirs[i]['path'])
                 bvps = self.generate_pos_psuedo_labels(frames, fs=self.config_data.FS)
             else:
                 bvps = self.read_wave(
