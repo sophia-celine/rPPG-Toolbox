@@ -36,14 +36,24 @@ class testLoader(BaseLoader):
         """
         super().__init__(name, data_path, config_data, device)
 
-    def get_raw_data(self, data_path):
-        """Returns data directories under the path(For test dataset)."""
-        print('getting raw data')
-        data_dirs = glob.glob(data_path + os.sep + "subject*")
+    def get_raw_data(self, data_path, suffix=None):
+        """Returns data directories under the path (For ICU dataset)."""
+
+        data_dirs = [
+            os.path.join(data_path, name)
+            for name in os.listdir(data_path)
+            if os.path.isdir(os.path.join(data_path, name))
+            and (suffix is None or name.endswith(suffix))
+        ]
+
         if not data_dirs:
             raise ValueError(self.dataset_name + " data paths empty!")
-        dirs = [{"index": re.search(
-            'subject(\d+)', data_dir).group(0), "path": data_dir} for data_dir in data_dirs]
+
+        dirs = [
+            {"index": os.path.basename(data_dir), "path": data_dir}
+            for data_dir in data_dirs
+        ]
+
         return dirs
 
     def split_raw_data(self, data_dirs, begin, end):
@@ -65,15 +75,35 @@ class testLoader(BaseLoader):
         try:
             filename = os.path.split(data_dirs[i]['path'])[-1]
             saved_filename = data_dirs[i]['index']
-            print(f'Test loader processing: {saved_filename}')
+
+            # Find AVI video
+            avi_files = [
+                os.path.join(data_dirs[i]['path'], file)
+                for file in os.listdir(data_dirs[i]['path'])
+                if file.lower().endswith('.avi')
+                and os.path.isfile(os.path.join(data_dirs[i]['path'], file))
+            ]
+
+            if len(avi_files) == 0:
+                raise ValueError(
+                    f"No AVI video found in directory: {data_dirs[i]['path']}"
+                )
+
+            if len(avi_files) > 1:
+                raise ValueError(
+                    f"Multiple AVI videos found in directory: {data_dirs[i]['path']}\n"
+                    f"Videos found: {avi_files}"
+                )
+
+            video_path = avi_files[0]
 
             # Read Frames
             if 'None' in config_preprocess.DATA_AUG:
                 # Utilize dataset-specific function to read video
                 frames = self.read_video(
-                    os.path.join(data_dirs[i]['path'],"vid.avi"),
-                    width=256,
-                    height=256)
+                    video_path,
+                    width=520,
+                    height=520)
             elif 'Motion' in config_preprocess.DATA_AUG:
                 # Utilize general function to read video in .npy format
                 frames = self.read_npy_video(

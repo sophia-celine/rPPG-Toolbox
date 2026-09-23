@@ -23,11 +23,11 @@ UNSUPERVISED:
       CHUNK_LENGTH: 180
       CROP_FACE:
         DO_CROP_FACE: True
-        BACKEND: 'HC'    # HC for Haar Cascade, Y5F for YOLO5Face, MEDIAPIPE for MediaPipe Face Mesh
+        BACKEND: 'MEDIAPIPE'    # HC for Haar Cascade, Y5F for YOLO5Face, MEDIAPIPE for MediaPipe Face Mesh
         USE_LARGE_FACE_BOX: False
         LARGE_BOX_COEF: 1.5
         REGION:
-          MODE: 'RECTANGLE'             # RECTANGLE or POLYGON
+          MODE: 'POLYGON'             # RECTANGLE or POLYGON
           SOURCE: 'MEDIAPIPE_FACE'
           EXCLUDE_EYES: True
           EXCLUDE_MOUTH: True
