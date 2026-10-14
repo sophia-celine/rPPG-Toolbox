@@ -1,4 +1,3 @@
-```bash
 #!/bin/bash
 
 # Check if a mode argument is provided
@@ -8,10 +7,23 @@ if [ -z "$1" ]; then
 fi
 
 MODE=$1
+echo "Selected mode: $MODE"
 
 # Function to set up using conda
 conda_setup() {
     echo "Setting up using conda..."
+
+    # Load Conda in this non-interactive Bash process
+    local conda_base
+    if [[ -n "${CONDA_EXE:-}" && -x "$CONDA_EXE" ]]; then
+        conda_base=$(dirname "$(dirname "$CONDA_EXE")")
+    elif command -v conda >/dev/null 2>&1; then
+        conda_base=$(conda info --base) || exit 1
+    else
+        echo "Conda is not available in this shell. Check that CONDA_EXE is exported or Conda is on PATH." >&2
+        exit 1
+    fi
+    source "$conda_base/etc/profile.d/conda.sh" || exit 1
 
     # Remove existing environment
     conda env remove --name rppg-toolbox311 -y >/dev/null 2>&1 || true
@@ -19,8 +31,7 @@ conda_setup() {
     # Create environment
     conda create -n rppg-toolbox311 python=3.11 -y || exit 1
 
-    # Initialize and activate conda
-    source "$(conda info --base)/etc/profile.d/conda.sh" || exit 1
+    # Activate Conda environment
     conda activate rppg-toolbox311 || exit 1
 
     # Install CUDA 12.8 compiler
@@ -143,4 +154,3 @@ case $MODE in
         exit 1
         ;;
 esac
-```
