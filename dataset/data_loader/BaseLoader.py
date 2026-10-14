@@ -323,7 +323,44 @@ class BaseLoader(Dataset):
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
         result = detector.detect(mp_image)
         if not result.face_landmarks:
-            return [0, 0, frame_width, frame_height], None
+            print('No face detected in the frame.')
+            if not hasattr(self, 'Y5FObj') or self.Y5FObj is None:
+                from dataset.data_loader.face_detector.YOLO5Face import YOLO5Face
+                # lazy-load the model in the subprocess
+                self.Y5FObj = YOLO5Face(self.config_data.PREPROCESS.CROP_FACE.BACKEND, self.device)
+
+            res = self.Y5FObj.detect_face(frame[:, :, :3].astype(np.uint8))
+
+            if res != None:
+                x_min, y_min, x_max, y_max = res
+
+                # Convert to this toolbox's expected format
+                # Expected format: [x_coord, y_coord, width, height]
+                x = x_min
+                y = y_min
+                width = x_max - x_min
+                height = y_max - y_min
+
+                # Find the center of the face zone
+                center_x = x + width // 2
+                center_y = y + height // 2
+
+                # Determine the size of the square (use the maximum of width and height)
+                square_size = max(width, height)
+
+                # Calculate the new coordinates for a square face zone
+                new_x = center_x - (square_size // 2)
+                new_y = center_y - (square_size // 2)
+                face_box_coor = [new_x, new_y, square_size, square_size]
+                # face_crop = frame[y_min:y_max, x_min:x_max]
+                # cv2.imshow("Face", face_crop)
+                # cv2.waitKey(0)
+                # cv2.destroyAllWindows()
+                print("Warning: No face detected with MediaPipe. Using YOLO5Face as fallback.")
+                return face_box_coor, None
+            else:
+                print("ERROR: No Face Detected with Y5F either")
+                return [0, 0, frame_width, frame_height], None
 
         mask = np.zeros((frame_height, frame_width), dtype=np.uint8)
         face_oval_indices = np.asarray([

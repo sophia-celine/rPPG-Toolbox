@@ -11,10 +11,10 @@ UNSUPERVISED:
     DO_PREPROCESS: True               # if first time, should be true
     DATA_FORMAT: NDHWC
     # DATA_PATH: "/home/sophia/rPPG-Toolbox/data/test/RawData"   # need to be updated
-    #DATA_PATH: "/mnt/a/dataset_raw"         
-    DATA_PATH: "/home/soph/ssd/dataset_raw/test"         
-    # CACHED_PATH: "/home/sophia/rPPG-Toolbox/data/test/preprocessed"    # Processed dataset save path, need to be updated
-    CACHED_PATH: "/home/soph/rppg/rPPG-Toolbox/data/icu/preprocessed"
+    DATA_PATH: "/mnt/a/dataset_raw/test"         
+    # DATA_PATH: "/home/soph/ssd/dataset_raw/test"         
+    CACHED_PATH: "/home/sophia/rPPG-Toolbox/data/test/preprocessed"    # Processed dataset save path, need to be updated
+    # CACHED_PATH: "/home/soph/rppg/rPPG-Toolbox/data/icu/preprocessed"
     EXP_DATA_NAME: ""
     BEGIN: 0.0
     END: 1.0
@@ -26,11 +26,11 @@ UNSUPERVISED:
       CHUNK_LENGTH: 180
       CROP_FACE:
         DO_CROP_FACE: True
-        BACKEND: 'MEDIAPIPE'    # HC for Haar Cascade, Y5F for YOLO5Face, MEDIAPIPE for MediaPipe Face Mesh
+        BACKEND: 'Y5F' #'MEDIAPIPE'    # HC for Haar Cascade, Y5F for YOLO5Face, MEDIAPIPE for MediaPipe Face Mesh
         USE_LARGE_FACE_BOX: False
         LARGE_BOX_COEF: 1.5
         REGION:
-          MODE: 'POLYGON'             # RECTANGLE or POLYGON
+          MODE: RECTANGLE #'POLYGON'             # RECTANGLE or POLYGON
           SOURCE: 'MEDIAPIPE_FACE'
           EXCLUDE_EYES: True
           EXCLUDE_MOUTH: True
