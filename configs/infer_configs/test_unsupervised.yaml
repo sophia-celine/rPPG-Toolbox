@@ -11,7 +11,7 @@ UNSUPERVISED:
     DO_PREPROCESS: True               # if first time, should be true
     DATA_FORMAT: NDHWC
     # DATA_PATH: "/home/sophia/rPPG-Toolbox/data/test/RawData"   # need to be updated
-    DATA_PATH: "/mnt/a/dataset_raw/test"         
+    DATA_PATH: "/mnt/a/dataset_raw/batch7"         
     # DATA_PATH: "/home/soph/ssd/dataset_raw/test"         
     CACHED_PATH: "/home/sophia/rPPG-Toolbox/data/test/preprocessed"    # Processed dataset save path, need to be updated
     # CACHED_PATH: "/home/soph/rppg/rPPG-Toolbox/data/icu/preprocessed"

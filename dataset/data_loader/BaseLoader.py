@@ -324,43 +324,7 @@ class BaseLoader(Dataset):
         result = detector.detect(mp_image)
         if not result.face_landmarks:
             print('No face detected in the frame.')
-            if not hasattr(self, 'Y5FObj') or self.Y5FObj is None:
-                from dataset.data_loader.face_detector.YOLO5Face import YOLO5Face
-                # lazy-load the model in the subprocess
-                self.Y5FObj = YOLO5Face(self.config_data.PREPROCESS.CROP_FACE.BACKEND, self.device)
-
-            res = self.Y5FObj.detect_face(frame[:, :, :3].astype(np.uint8))
-
-            if res != None:
-                x_min, y_min, x_max, y_max = res
-
-                # Convert to this toolbox's expected format
-                # Expected format: [x_coord, y_coord, width, height]
-                x = x_min
-                y = y_min
-                width = x_max - x_min
-                height = y_max - y_min
-
-                # Find the center of the face zone
-                center_x = x + width // 2
-                center_y = y + height // 2
-
-                # Determine the size of the square (use the maximum of width and height)
-                square_size = max(width, height)
-
-                # Calculate the new coordinates for a square face zone
-                new_x = center_x - (square_size // 2)
-                new_y = center_y - (square_size // 2)
-                face_box_coor = [new_x, new_y, square_size, square_size]
-                # face_crop = frame[y_min:y_max, x_min:x_max]
-                # cv2.imshow("Face", face_crop)
-                # cv2.waitKey(0)
-                # cv2.destroyAllWindows()
-                print("Warning: No face detected with MediaPipe. Using YOLO5Face as fallback.")
-                return face_box_coor, None
-            else:
-                print("ERROR: No Face Detected with Y5F either")
-                return [0, 0, frame_width, frame_height], None
+            return [0, 0, frame_width, frame_height], None
 
         mask = np.zeros((frame_height, frame_width), dtype=np.uint8)
         face_oval_indices = np.asarray([
@@ -402,7 +366,7 @@ class BaseLoader(Dataset):
             return [0, 0, frame_width, frame_height], None
         return [int(xs.min()), int(ys.min()), int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)], mask
 
-    def face_detection(self, frame, backend, use_larger_box=False, larger_box_coef=1.0,
+    def face_detection(self, frame, backend, last_detection, use_larger_box=False, larger_box_coef=1.0,
                        return_polygon=False):
         """Face detection on a single frame.
 
@@ -411,6 +375,7 @@ class BaseLoader(Dataset):
             backend(str): backend to utilize for face detection.
             use_larger_box(bool): whether to use a larger bounding box on face detection.
             larger_box_coef(float): Coef. of larger box.
+            last_detection: coordinates of the last face detection
         Returns:
             face_box_coor(List[int]): coordinates of face bounding box.
         """
@@ -428,7 +393,12 @@ class BaseLoader(Dataset):
 
             if len(face_zone) < 1:
                 print("ERROR: No Face Detected")
-                face_box_coor = [0, 0, frame.shape[1], frame.shape[0]]
+                if last_detection:
+                    face_box_coor = last_detection
+                    print("Using last face detection")
+                else:
+                    face_box_coor = [0, 0, frame.shape[1], frame.shape[0]]
+                    raise Exception("No face detected")
             elif len(face_zone) >= 2:
                 # Find the index of the largest face zone
                 # The face zones are boxes, so the width and height are the same
@@ -475,7 +445,15 @@ class BaseLoader(Dataset):
 
             else:
                 print("ERROR: No Face Detected")
-                face_box_coor = [0, 0, frame.shape[1], frame.shape[0]]
+                if last_detection:
+                    face_box_coor = last_detection
+                    print("Using last face detection")
+                else:
+                    face_box_coor = [0, 0, frame.shape[1], frame.shape[0]]
+                    cv2.imshow("Frame", frame)
+                    cv2.waitKey(0)
+                    cv2.destroyAllWindows()
+                    raise Exception("No face detected")
         elif backend.upper() in ("MP", "MEDIAPIPE"):
             face_box_coor, face_mask = self._mediapipe_face_detection(frame)
         else:
@@ -510,6 +488,7 @@ class BaseLoader(Dataset):
         Returns:
             resized_frames(list[np.array(float)]): Resized and cropped frames
         """
+        save_video_roi = True
         region_mode = region_mode.upper()
         if region_mode not in ('RECTANGLE', 'POLYGON'):
             raise ValueError("Unsupported region mode. Use 'RECTANGLE' or 'POLYGON'.")
@@ -529,11 +508,13 @@ class BaseLoader(Dataset):
         face_region_all = []
         face_mask_all = []
         # Perform face detection by num_dynamic_det" times.
+        last_detection = None
         for idx in range(num_dynamic_det):
             if use_face_detection:
                 detection = self.face_detection(
-                    frames[detection_freq * idx], backend, use_larger_box, larger_box_coef,
+                    frames[detection_freq * idx], backend, last_detection, use_larger_box, larger_box_coef,
                     return_polygon=polygon_mode)
+                last_detection = detection
                 if polygon_mode:
                     face_region, face_mask = detection
                     face_region_all.append(face_region)
