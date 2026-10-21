@@ -314,17 +314,28 @@ class BaseLoader(Dataset):
             self.MPObj = vision.FaceLandmarker.create_from_options(options)
         return self.MPObj
 
-    def _mediapipe_face_detection(self, frame):
+    def _mediapipe_face_detection(self, frame, last_detection):
         detector = self._get_mediapipe_detector()
         mp = self.MPModule
         region_config = self.config_data.PREPROCESS.CROP_FACE.REGION
         frame_height, frame_width = frame.shape[:2]
-        frame_rgb = cv2.cvtColor(frame[:, :, :3].astype(np.uint8), cv2.COLOR_BGR2RGB)
+        frame_rgb = frame[:, :, :3].astype(np.uint8)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
         result = detector.detect(mp_image)
         if not result.face_landmarks:
             print('No face detected in the frame.')
-            return [0, 0, frame_width, frame_height], None
+            if last_detection:
+                last_face_region, last_mask = last_detection
+                if last_mask is not None:
+                    print('Using last mediapipe detection')
+                    return last_face_region, last_mask
+            else:
+                # cv2.imshow("Frame", frame)
+                # cv2.waitKey(0)
+                # cv2.destroyAllWindows()
+                np.save("/tmp/frame_pipeline.npy", frame[:, :, :3])
+                raise Exception('No face detected, no last detection')
+                # return [0, 0, frame_width, frame_height], None
 
         mask = np.zeros((frame_height, frame_width), dtype=np.uint8)
         face_oval_indices = np.asarray([
@@ -455,7 +466,7 @@ class BaseLoader(Dataset):
                     cv2.destroyAllWindows()
                     raise Exception("No face detected")
         elif backend.upper() in ("MP", "MEDIAPIPE"):
-            face_box_coor, face_mask = self._mediapipe_face_detection(frame)
+            face_box_coor, face_mask = self._mediapipe_face_detection(frame, last_detection)
         else:
             raise ValueError("Unsupported face detection backend!")
 

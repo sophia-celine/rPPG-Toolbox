@@ -121,9 +121,7 @@ class testLoader(BaseLoader):
             if 'None' in config_preprocess.DATA_AUG:
                 # Utilize dataset-specific function to read video
                 frames = self.read_video(
-                    video_path,
-                    width=520,
-                    height=520)
+                    video_path)
             elif 'Motion' in config_preprocess.DATA_AUG:
                 # Utilize general function to read video in .npy format
                 frames = self.read_npy_video(
@@ -143,8 +141,8 @@ class testLoader(BaseLoader):
             if len(bvps) != frames.shape[0]:
                 bvps = BaseLoader.resample_ppg(bvps, frames.shape[0])
                 
-            frames_clips, bvps_clips = self.preprocess(frames, bvps, config_preprocess)
-            input_name_list, label_name_list = self.save_multi_process(frames_clips, bvps_clips, saved_filename)
+            frames, bvps_clips = self.preprocess(frames, bvps, config_preprocess)
+            input_name_list, label_name_list = self.save_multi_process(frames, bvps_clips, saved_filename)
             file_list_dict[i] = input_name_list
             print(f"Successfully finished processing {saved_filename}")
 
@@ -154,12 +152,15 @@ class testLoader(BaseLoader):
             traceback.print_exc()
 
     @staticmethod
-    def read_video(video_file, width=128, height=128):
+    def read_video(video_file):
         """Reads a video file, returns frames(T, H, W, 3) """
         VidObj = cv2.VideoCapture(video_file)
         total_frames = int(VidObj.get(cv2.CAP_PROP_FRAME_COUNT))
         orig_width = int(VidObj.get(cv2.CAP_PROP_FRAME_WIDTH))
         orig_height = int(VidObj.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        scale = 0.25
+        width = int(orig_width*scale)
+        height = int(orig_height*scale)
         print(f"Reading {video_file}: {total_frames} frames. Resizing from {orig_width}x{orig_height} to {width}x{height}")
         
         VidObj.set(cv2.CAP_PROP_POS_MSEC, 0)
